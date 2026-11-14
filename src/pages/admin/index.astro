@@ -39,116 +39,33 @@ function fmtDate(v: string): string {
 ---
 
 <AdminLayout title="文章" active="posts" username={user.username}>
-	<div class="mb-5 flex flex-wrap items-center gap-3">
-		<h1 class="text-xl font-bold text-(--deep-text)">文章</h1>
-		<span class="text-sm text-black/55 dark:text-white/55">
-			共 {total} 篇 · 草稿 {drafts} 篇
-		</span>
-		<div class="ml-auto flex items-center gap-2">
-			<input
-				id="search-input"
-				class="admin-input"
-				style="width: 14rem;"
-				type="search"
-				placeholder="搜索标题或 slug"
-			/>
-			<a href="/admin/posts/new/" class="admin-btn admin-btn-primary">写文章</a>
-		</div>
-	</div>
-
-	{loadError && <div class="admin-alert admin-alert-error mb-4">读取失败：{loadError}</div>}
-
-	<div class="card-base overflow-hidden">
-		{posts.length === 0 ? (
-			<div class="px-6 py-16 text-center text-sm text-black/50 dark:text-white/50">
-				还没有文章。点击右上角「写文章」开始。
-			</div>
-		) : (
-			<table class="admin-table">
-				<thead>
-					<tr>
-						<th>标题</th>
-						<th style="width: 8rem;">分类</th>
-						<th style="width: 7rem;">状态</th>
-						<th style="width: 7rem;">日期</th>
-						<th style="width: 9rem;"></th>
-					</tr>
-				</thead>
-				<tbody id="post-tbody">
-					{posts.map((p) => (
-						<tr data-slug={p.slug} data-title={p.title.toLowerCase()}>
-							<td>
-								<div class="flex items-center gap-2">
-									{p.pinned === 1 && (
-										<span class="admin-badge admin-badge-pinned">置顶</span>
-									)}
-									<a
-										href={`/admin/posts/${p.slug}/`}
-										class="font-medium hover:text-(--primary)"
-									>
-										{p.title}
-									</a>
-								</div>
-								<div class="mt-0.5 text-xs text-black/40 dark:text-white/40">
-									/{p.slug}/
-								</div>
-							</td>
-							<td class="text-sm text-black/65 dark:text-white/65">
-								{p.category || "—"}
-							</td>
-							<td>
-								{p.draft === 1 ? (
-									<span class="admin-badge admin-badge-draft">草稿</span>
-								) : (
-									<span class="admin-badge admin-badge-live">已发布</span>
-								)}
-							</td>
-							<td class="text-sm text-black/55 dark:text-white/55">
-								{fmtDate(p.published_at)}
-							</td>
-							<td>
-								<div class="flex items-center gap-1.5">
-									<a
-										href={`/admin/posts/${p.slug}/`}
-										class="admin-btn"
-										style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
-									>
-										编辑
-									</a>
-									<button
-										type="button"
-										class="admin-btn admin-btn-danger js-delete"
-										data-slug={p.slug}
-										data-title={p.title}
-										style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
-									>
-										删除
-									</button>
-								</div>
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		)}
-	</div>
+	<div class="admin-page-header"><div><div class="admin-page-kicker">Content desk / overview</div><h1 class="admin-page-title">文章</h1><p class="admin-page-description">管理已发布内容与待完成的草稿。</p></div><div class="admin-page-actions"><a href="/admin/posts/new/" class="admin-btn admin-btn-primary">写一篇新文章</a></div></div>
+	{loadError && <div class="admin-alert admin-alert-error mb-4" role="alert">读取失败：{loadError}</div>}
+	<div class="admin-stat-strip" aria-label="文章统计"><div class="admin-stat"><div class="admin-stat-label">全部文章</div><div class="admin-stat-value" data-stat="total">{total}</div></div><div class="admin-stat" data-tone="success"><div class="admin-stat-label">已发布</div><div class="admin-stat-value" data-stat="live">{total - drafts}</div></div><div class="admin-stat" data-tone="warning"><div class="admin-stat-label">草稿</div><div class="admin-stat-value" data-stat="draft">{drafts}</div></div></div>
+	<div class="admin-toolbar"><label class="admin-search-wrap"><span class="sr-only">搜索文章</span><span class="admin-search-icon" aria-hidden="true">⌕</span><input id="search-input" class="admin-input" type="search" placeholder="搜索标题或 slug" autocomplete="off" /></label><span class="admin-toolbar-note" id="search-note" role="status" aria-live="polite">显示全部 {total} 篇</span></div>
+	<div class="admin-section-card"><div id="posts-views" class={posts.length === 0 ? "hidden" : undefined}><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>标题</th><th style="width: 8rem;">分类</th><th style="width: 8rem;">状态</th><th style="width: 7rem;">日期</th><th style="width: 9rem;"></th></tr></thead><tbody id="post-tbody">{posts.map((p) => <tr data-slug={p.slug} data-draft={p.draft === 1 ? "1" : "0"} data-title={p.title.toLowerCase()}><td><div class="admin-badge-row">{p.pinned === 1 && <span class="admin-badge admin-badge-pinned">置顶</span>}<a href={`/admin/posts/${p.slug}/`} class="admin-post-title">{p.title}</a></div><div class="admin-post-slug">/{p.slug}/</div></td><td>{p.category || "—"}</td><td>{p.draft === 1 ? <span class="admin-badge admin-badge-draft">草稿</span> : <span class="admin-badge admin-badge-live">已发布</span>}</td><td>{fmtDate(p.published_at)}</td><td><div class="admin-table-actions"><a href={`/admin/posts/${p.slug}/`} class="admin-btn">编辑</a><button type="button" class="admin-btn admin-btn-danger js-delete" data-slug={p.slug} data-title={p.title}>删除</button></div></td></tr>)}</tbody></table></div><div class="admin-mobile-posts" id="mobile-posts">{posts.map((p) => <article class="admin-mobile-post" data-slug={p.slug} data-draft={p.draft === 1 ? "1" : "0"} data-title={p.title.toLowerCase()}><div class="admin-badge-row">{p.draft === 1 ? <span class="admin-badge admin-badge-draft">草稿</span> : <span class="admin-badge admin-badge-live">已发布</span>}{p.pinned === 1 && <span class="admin-badge admin-badge-pinned">置顶</span>}</div><a href={`/admin/posts/${p.slug}/`} class="admin-post-title">{p.title}</a><div class="admin-post-slug">/{p.slug}/</div><div class="admin-mobile-post-meta"><span>{p.category || "未分类"}</span><time>{fmtDate(p.published_at)}</time></div><div class="admin-mobile-post-actions"><a href={`/admin/posts/${p.slug}/`} class="admin-btn">编辑</a><button type="button" class="admin-btn admin-btn-danger js-delete" data-slug={p.slug} data-title={p.title}>删除</button></div></article>)}</div><div id="no-results" class="admin-empty hidden"><div class="admin-empty-title">没有匹配的文章</div><p class="admin-empty-description">换一个标题或 slug 试试。</p></div></div><div id="empty-state" class={posts.length === 0 ? "admin-empty" : "admin-empty hidden"}><div class="admin-empty-title">还没有文章</div><p class="admin-empty-description">从一篇短文开始，点击右上角「写一篇新文章」。</p></div></div>
 </AdminLayout>
 
 <script>
 	// 前端筛选：数据量小，直接在本地过滤，避免额外请求
 	const input = document.getElementById("search-input") as HTMLInputElement | null;
-	const tbody = document.getElementById("post-tbody");
+	const note = document.getElementById("search-note");
+	const noResults = document.getElementById("no-results");
 
-	input?.addEventListener("input", () => {
-		const q = input.value.trim().toLowerCase();
-		tbody?.querySelectorAll("tr").forEach((tr) => {
-			const row = tr as HTMLElement;
-			const title = row.dataset.title ?? "";
-			const slug = (row.dataset.slug ?? "").toLowerCase();
-			const hit = !q || title.includes(q) || slug.includes(q);
-			row.style.display = hit ? "" : "none";
+	function updateSearch() {
+		const q = input?.value.trim().toLowerCase() ?? "";
+		const items = document.querySelectorAll<HTMLElement>("[data-title][data-slug]");
+		let visible = 0;
+		items.forEach((item) => {
+			const hit = !q || (item.dataset.title ?? "").includes(q) || (item.dataset.slug ?? "").toLowerCase().includes(q);
+			item.hidden = !hit;
+			if (hit) visible++;
 		});
-	});
+		if (note) note.textContent = q ? `找到 ${visible} 篇` : `显示全部 ${visible} 篇`;
+		noResults?.classList.toggle("hidden", visible > 0);
+	}
+
+	input?.addEventListener("input", updateSearch);
 
 	// 删除：二次确认后调用 API
 	document.querySelectorAll(".js-delete").forEach((btn) => {

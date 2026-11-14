@@ -182,11 +182,12 @@ let seedPromise: Promise<void> | null = null;
  * 只导入一次：导入后 posts 表非空，后续请求直接跳过。
  */
 async function runSeed(db: D1Like, assets: AssetsBinding, origin: string): Promise<void> {
-	const count = await db
-		.prepare("SELECT COUNT(*) AS c FROM posts")
-		.first<{ c: number }>();
+	// 用 EXISTS 取代 COUNT(*)：只要有一行就返回，避免全表扫描。
+	const exists = await db
+		.prepare("SELECT 1 AS x FROM posts LIMIT 1")
+		.first<{ x: number }>();
 
-	if ((count?.c ?? 0) > 0) {
+	if (exists) {
 		return;
 	}
 
@@ -213,8 +214,7 @@ async function runSeed(db: D1Like, assets: AssetsBinding, origin: string): Promi
 	for (const stmt of statements) {
 		await db.prepare(stmt).run();
 	}
-	const after = await db.prepare("SELECT COUNT(*) AS c FROM posts").first<{ c: number }>();
-	console.log(`[auto-seed] 导入完成，现有 ${after?.c ?? 0} 篇文章`);
+	console.log(`[auto-seed] 导入完成，共 ${statements.length} 条语句`);
 }
 
 export async function ensureSeed(

@@ -1,190 +1,307 @@
 /*
- * 后台管理样式。
- *
- * 设计原则：复用主站的设计变量（--primary / --radius-large / --card-bg 等）
- * 与已有组件类（card-base / btn-regular），保证后台与前台观感一致，
- * 不引入独立的设计体系。
+ * Firefly 后台「夜航控制台」样式。
+ * 所有选择器都以 admin 命名空间开头，避免影响主站页面。
+ * 颜色策略（重要）：主题变量来自 src/styles/variables.styl，但 `--deep-text` 只在
+ * 亮色 :root 定义、暗色下没有覆盖（StepItem/TimelineItem 里有同样的注释）。因此
+ * 后台不再继承 `--deep-text`，而是在 .admin-shell 内显式声明文本与状态色，并在
+ * `:root.dark` 下做局域覆盖——不改动全局 variables.styl。
+ * 每对前景/背景的 WCAG 对比度都写在注释里（hue=165 实测）。
  */
 
 .admin-shell {
+	--admin-surface: var(--card-bg);
+	--admin-surface-raised: color-mix(in oklch, var(--card-bg) 92%, var(--primary));
+	--admin-surface-hover: var(--btn-card-bg-hover);
+	--admin-border: var(--line-divider);
+	/* 控件描边需与底色 ≥3:1（WCAG 1.4.11）；亮色取 52% 文本色 ≈3.2:1 */
+	--admin-control-border: color-mix(in oklch, var(--admin-text) 52%, transparent);
+
+	/* 文本层级（亮色） */
+	--admin-text: oklch(0.25 0.02 var(--hue)); /* 15.9:1 on white */
+	--admin-muted: oklch(0.44 0.02 var(--hue)); /* 7.7:1 on white */
+	--admin-placeholder: oklch(0.52 0.02 var(--hue)); /* 5.4:1 on white */
+	--admin-accent-text: oklch(0.45 0.09 var(--hue)); /* 7.1:1 on white */
+	--admin-ink-on-accent: oklch(0.18 0.02 var(--hue)); /* 7.5:1 on --primary */
+
+	/* 焦点环用实心色：亮色 5.3:1（1.4.11 / 2.4.11 要求 ≥3:1） */
+	--admin-focus-ring: oklch(0.5 0.15 var(--hue));
+	--admin-focus-halo: color-mix(in oklch, var(--admin-focus-ring) 30%, transparent);
+
+	/* 状态色（亮色） */
+	--admin-success: oklch(0.42 0.12 152); /* 7.9:1 on white */
+	--admin-warning: oklch(0.5 0.13 70); /* 6.3:1 on white */
+	--admin-danger: oklch(0.5 0.19 25); /* 6.6:1 on white */
+
+	/* 徽章：固定底色/字色配对，不用透明叠加，避免对比度被稀释 */
+	--admin-badge-pinned-bg: oklch(0.93 0.06 var(--hue));
+	--admin-badge-pinned-fg: oklch(0.42 0.12 var(--hue)); /* 6.4:1 */
+	--admin-badge-draft-bg: oklch(0.95 0.05 70);
+	--admin-badge-draft-fg: oklch(0.42 0.1 70); /* 7.3:1 */
+	--admin-badge-live-bg: oklch(0.94 0.05 152);
+	--admin-badge-live-fg: oklch(0.4 0.1 152); /* 7.5:1 */
+
+	--admin-nav-active-bg: color-mix(in oklch, var(--primary) 16%, var(--admin-surface));
+
 	min-height: 100vh;
-	background: var(--page-bg);
+	background:
+		radial-gradient(circle at 90% 0%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 28rem),
+		var(--page-bg);
+	color: var(--admin-text);
 }
 
-/* 表单控件：沿用主站变量，圆角与按钮保持一致 */
-.admin-field {
+/* 暗色局域覆盖：仅作用于后台壳层，不触碰主站主题变量 */
+:root.dark .admin-shell {
+	--admin-control-border: color-mix(in oklch, var(--admin-text) 42%, transparent);
+
+	--admin-text: oklch(0.96 0.01 var(--hue)); /* 15.0:1 on dark card */
+	--admin-muted: oklch(0.78 0.02 var(--hue)); /* 8.5:1 on dark card */
+	--admin-placeholder: oklch(0.64 0.02 var(--hue)); /* 5.1:1 on dark card */
+	--admin-accent-text: oklch(0.82 0.1 var(--hue)); /* 10.0:1 on dark card */
+	--admin-ink-on-accent: oklch(0.16 0.02 var(--hue)); /* 9.2:1 on dark --primary */
+
+	--admin-focus-ring: oklch(0.85 0.13 var(--hue)); /* 11.2:1 on dark card */
+
+	--admin-success: oklch(0.82 0.12 152); /* 10.1:1 on dark card */
+	--admin-warning: oklch(0.86 0.12 80); /* 10.9:1 on dark card */
+	--admin-danger: oklch(0.8 0.13 25); /* 8.3:1 on dark card */
+
+	--admin-badge-pinned-bg: oklch(0.32 0.05 var(--hue));
+	--admin-badge-pinned-fg: oklch(0.9 0.07 var(--hue)); /* 9.5:1 */
+	--admin-badge-draft-bg: oklch(0.33 0.04 70);
+	--admin-badge-draft-fg: oklch(0.9 0.07 80); /* 9.1:1 */
+	--admin-badge-live-bg: oklch(0.32 0.04 152);
+	--admin-badge-live-fg: oklch(0.9 0.07 152); /* 9.5:1 */
+}
+
+/* 用 el.hidden 做筛选/空态时，避免被 flex 布局覆盖掉 */
+.admin-shell [hidden] {
+	display: none !important;
+}
+
+.admin-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	border-bottom: 1px solid var(--admin-border);
+	background: color-mix(in oklch, var(--admin-surface) 90%, transparent);
+	backdrop-filter: blur(14px);
+}
+
+.admin-topbar-inner,
+.admin-main {
+	width: min(100% - 2rem, 72rem);
+	margin-inline: auto;
+}
+
+.admin-topbar-inner {
 	display: flex;
-	flex-direction: column;
-	gap: 0.375rem;
+	align-items: center;
+	gap: 1.25rem;
+	min-height: 4.25rem;
 }
 
-.admin-label {
-	font-size: 0.8125rem;
-	font-weight: 500;
-	color: var(--deep-text);
-	opacity: 0.75;
+.admin-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.65rem;
+	font-size: 0.95rem;
+	font-weight: 750;
+	letter-spacing: -0.01em;
+	color: var(--admin-text);
 }
 
-.admin-input,
-.admin-textarea,
-.admin-select {
-	width: 100%;
+.admin-brand-mark {
+	display: grid;
+	place-items: center;
+	width: 1.85rem;
+	height: 1.85rem;
+	border-radius: 0.65rem;
+	background: var(--primary);
+	color: var(--admin-ink-on-accent);
+	font-size: 0.7rem;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+}
+
+.admin-nav {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.admin-nav-link,
+.admin-top-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.5rem;
 	padding: 0.5rem 0.75rem;
-	border-radius: calc(var(--radius-large) - 0.5rem);
-	border: 1px solid var(--line-color);
-	background: var(--card-bg);
-	color: var(--deep-text);
+	border-radius: 0.65rem;
+	font-size: 0.8125rem;
+	font-weight: 550;
+	transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.admin-nav-link { color: var(--admin-muted); }
+.admin-nav-link:hover { color: var(--admin-accent-text); background: var(--admin-surface-hover); }
+/* 激活态不借 --btn-content：亮色仅 3.96:1，达不到小字 4.5:1 */
+.admin-nav-link[data-active="true"] { color: var(--admin-text); background: var(--admin-nav-active-bg); }
+.admin-top-actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.admin-top-action { color: var(--admin-muted); }
+.admin-top-action:hover { color: var(--admin-accent-text); background: var(--admin-surface-hover); }
+.admin-user { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--admin-muted); font-size: 0.75rem; }
+
+.admin-main { padding-block: 2rem 4rem; }
+.admin-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.25rem; margin-bottom: 1.5rem; }
+.admin-page-kicker { margin-bottom: 0.35rem; color: var(--admin-accent-text); font-family: var(--font-code, ui-monospace, monospace); font-size: 0.68rem; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+.admin-page-title { margin: 0; color: var(--admin-text); font-size: clamp(1.55rem, 2vw, 2rem); font-weight: 780; letter-spacing: -0.04em; }
+.admin-page-description { margin-top: 0.45rem; color: var(--admin-muted); font-size: 0.875rem; }
+.admin-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.admin-backlink { display: inline-flex; align-items: center; min-height: 2.5rem; color: var(--admin-muted); font-size: 0.8125rem; }
+.admin-backlink:hover { color: var(--admin-accent-text); }
+
+.admin-stat-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+.admin-stat { padding: 0.9rem 1rem; border: 1px solid var(--admin-border); border-radius: 0.85rem; background: var(--admin-surface-raised); }
+.admin-stat-label { color: var(--admin-muted); font-size: 0.72rem; }
+.admin-stat-value { margin-top: 0.2rem; color: var(--admin-text); font-family: var(--font-code, ui-monospace, monospace); font-size: 1.3rem; font-weight: 650; }
+.admin-stat[data-tone="success"] .admin-stat-value { color: var(--admin-success); }
+.admin-stat[data-tone="warning"] .admin-stat-value { color: var(--admin-warning); }
+
+.admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
+.admin-search-wrap { position: relative; flex: 1; max-width: 22rem; }
+.admin-search-wrap .admin-input { padding-left: 2.25rem; }
+.admin-search-icon { position: absolute; top: 50%; left: 0.8rem; color: var(--admin-muted); transform: translateY(-50%); pointer-events: none; }
+.admin-toolbar-note { color: var(--admin-muted); font-size: 0.75rem; }
+
+.admin-section-card { border: 1px solid var(--admin-border); border-radius: 1rem; background: var(--admin-surface); box-shadow: 0 1rem 3rem color-mix(in oklch, var(--page-bg) 16%, transparent); }
+.admin-section-card-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--admin-border); }
+.admin-section-card-title { margin: 0; color: var(--admin-text); font-size: 0.9rem; font-weight: 700; }
+.admin-section-card-body { padding: 1.15rem; }
+
+.admin-field { display: flex; flex-direction: column; gap: 0.4rem; }
+.admin-label { color: var(--admin-muted); font-size: 0.75rem; font-weight: 650; }
+.admin-help { color: var(--admin-muted); font-size: 0.72rem; line-height: 1.5; }
+.admin-input, .admin-textarea, .admin-select {
+	width: 100%;
+	min-height: 2.75rem;
+	padding: 0.65rem 0.8rem;
+	border: 1px solid var(--admin-control-border);
+	border-radius: 0.65rem;
+	background: color-mix(in oklch, var(--admin-surface) 86%, var(--page-bg));
+	color: var(--admin-text);
 	font-size: 0.875rem;
-	transition: border-color 150ms, box-shadow 150ms;
+	transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
+.admin-input::placeholder, .admin-textarea::placeholder { color: var(--admin-placeholder); }
+.admin-input:hover, .admin-textarea:hover, .admin-select:hover { border-color: color-mix(in oklch, var(--primary) 55%, var(--admin-control-border)); }
+/* 焦点：实心 2px 环（亮色 5.3:1 / 暗色 11.2:1），旧实现是 30% 透明主色 1.3:1 */
+.admin-input:focus, .admin-textarea:focus, .admin-select:focus { outline: 2px solid var(--admin-focus-ring); outline-offset: 1px; border-color: var(--admin-focus-ring); box-shadow: 0 0 0 3px var(--admin-focus-halo); }
+.admin-textarea { min-height: 7rem; resize: vertical; line-height: 1.7; }
+.admin-textarea[name="body_md"] { min-height: 32rem; font-family: var(--font-code, ui-monospace, monospace); font-size: 0.8125rem; line-height: 1.75; }
 
-.admin-input:focus,
-.admin-textarea:focus,
-.admin-select:focus {
-	outline: none;
-	border-color: var(--primary);
-	box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 18%, transparent);
-}
-
-.admin-textarea {
-	resize: vertical;
-	min-height: 6rem;
-	font-family: var(--font-code, ui-monospace, monospace);
-	line-height: 1.6;
-}
-
-/* 主操作按钮：与主站 btn-regular 同源，改用品牌色强调 */
 .admin-btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 0.375rem;
-	padding: 0.5rem 1rem;
-	border-radius: calc(var(--radius-large) - 0.5rem);
-	font-size: 0.875rem;
-	font-weight: 500;
-	background: var(--btn-regular-bg);
-	color: var(--btn-content);
-	transition: background-color 150ms;
+	gap: 0.4rem;
+	min-height: 2.5rem;
+	padding: 0.55rem 0.9rem;
+	border: 1px solid var(--admin-control-border);
+	border-radius: 0.65rem;
+	background: var(--admin-surface);
+	color: var(--admin-text);
+	font-size: 0.8125rem;
+	font-weight: 650;
 	cursor: pointer;
-	border: none;
+	transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+.admin-btn:hover { border-color: color-mix(in oklch, var(--primary) 55%, var(--admin-control-border)); background: var(--admin-surface-hover); color: var(--admin-accent-text); }
+.admin-btn:active { transform: translateY(1px); }
+/* 主按钮：深墨字压在主题色上（7.5:1），而不是低对比的 --btn-content（1.8:1） */
+.admin-btn-primary { border-color: transparent; background: var(--primary); color: var(--admin-ink-on-accent); }
+.admin-btn-primary:hover { border-color: transparent; background: color-mix(in oklch, var(--primary) 88%, white); color: var(--admin-ink-on-accent); }
+.admin-btn-danger { border-color: color-mix(in oklch, var(--admin-danger) 45%, var(--admin-border)); color: var(--admin-danger); }
+.admin-btn-danger:hover { border-color: color-mix(in oklch, var(--admin-danger) 65%, var(--admin-border)); background: color-mix(in oklch, var(--admin-danger) 10%, transparent); color: var(--admin-danger); }
+.admin-btn:disabled { opacity: 0.55; cursor: wait; transform: none; }
+.admin-btn:focus-visible, .admin-nav-link:focus-visible, .admin-top-action:focus-visible, .admin-backlink:focus-visible, .admin-brand:focus-visible, .admin-table a:focus-visible, .admin-details-summary:focus-visible { outline: 2px solid var(--admin-focus-ring); outline-offset: 2px; }
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.admin-table th { padding: 0.7rem 1rem; border-bottom: 1px solid var(--admin-border); color: var(--admin-muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; }
+.admin-table td { padding: 0.95rem 1rem; border-bottom: 1px solid var(--admin-border); color: var(--admin-text); vertical-align: middle; }
+.admin-table tbody tr:last-child td { border-bottom: 0; }
+.admin-table tbody tr:hover { background: var(--admin-surface-hover); }
+.admin-post-title { display: block; color: var(--admin-text); font-weight: 650; }
+.admin-post-title:hover { color: var(--admin-accent-text); }
+.admin-post-slug { margin-top: 0.25rem; color: var(--admin-muted); font-family: var(--font-code, ui-monospace, monospace); font-size: 0.7rem; }
+.admin-table-actions { display: flex; justify-content: flex-end; gap: 0.4rem; }
+
+.admin-badge { display: inline-flex; align-items: center; min-height: 1.5rem; padding: 0.18rem 0.5rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.admin-badge-draft { background: var(--admin-badge-draft-bg); color: var(--admin-badge-draft-fg); }
+.admin-badge-live { background: var(--admin-badge-live-bg); color: var(--admin-badge-live-fg); }
+.admin-badge-pinned { background: var(--admin-badge-pinned-bg); color: var(--admin-badge-pinned-fg); }
+.admin-badge-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.admin-mobile-posts { display: none; }
+.admin-empty { padding: 4rem 1.5rem; text-align: center; }
+.admin-empty-title { color: var(--admin-text); font-weight: 700; }
+.admin-empty-description { margin-top: 0.4rem; color: var(--admin-muted); font-size: 0.8125rem; }
+.admin-alert { padding: 0.8rem 0.95rem; border: 1px solid transparent; border-radius: 0.7rem; font-size: 0.8125rem; line-height: 1.5; }
+.admin-alert-error { border-color: color-mix(in oklch, var(--admin-danger) 25%, transparent); background: color-mix(in oklch, var(--admin-danger) 9%, transparent); color: var(--admin-danger); }
+.admin-alert-ok { border-color: color-mix(in oklch, var(--admin-success) 25%, transparent); background: color-mix(in oklch, var(--admin-success) 9%, transparent); color: var(--admin-success); }
+
+.admin-editor-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.85fr); align-items: start; gap: 1rem; }
+.admin-editor-main, .admin-editor-sidebar { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.admin-editor-title-input { min-height: 3.25rem; font-size: 1.1rem; font-weight: 700; }
+.admin-editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.admin-editor-mode { color: var(--admin-muted); font-family: var(--font-code, ui-monospace, monospace); font-size: 0.7rem; }
+.admin-status-track { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; margin-bottom: 1.25rem; padding: 0.7rem 0.85rem; border: 1px solid var(--admin-border); border-radius: 0.75rem; background: color-mix(in oklch, var(--admin-surface) 75%, transparent); color: var(--admin-muted); font-size: 0.75rem; }
+.admin-status-track strong { color: var(--admin-text); }
+.admin-status-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--admin-warning); }
+.admin-status-dot[data-published="true"] { background: var(--admin-success); }
+.admin-checkbox-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.admin-checkbox { display: flex; align-items: flex-start; gap: 0.6rem; color: var(--admin-text); font-size: 0.8125rem; line-height: 1.4; cursor: pointer; }
+.admin-checkbox input { width: 1.05rem; height: 1.05rem; margin-top: 0.05rem; accent-color: var(--primary); }
+.admin-sticky-card { position: sticky; top: 5.5rem; }
+.admin-details-summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 1rem 1.15rem; color: var(--admin-text); font-size: 0.9rem; font-weight: 700; cursor: pointer; list-style: none; }
+.admin-details-summary::-webkit-details-marker { display: none; }
+.admin-details-summary::after { content: "展开"; color: var(--admin-muted); font-size: 0.7rem; font-weight: 550; }
+.admin-details[open] > .admin-details-summary::after { content: "收起"; }
+.admin-login-wrap { display: grid; place-items: center; min-height: min(70vh, 42rem); padding: 2rem 0; }
+.admin-login-card { width: min(100%, 27rem); }
+.admin-login-card .admin-section-card-body { padding: 1.75rem; }
+.admin-login-mark { margin-bottom: 1.25rem; }
+
+@media (max-width: 767px) {
+	.admin-topbar-inner, .admin-main { width: min(100% - 1.25rem, 72rem); }
+	.admin-topbar-inner { flex-wrap: wrap; gap: 0.5rem; padding-block: 0.75rem; }
+	.admin-nav { order: 3; width: 100%; overflow-x: auto; padding-bottom: 0.1rem; }
+	.admin-nav-link { flex: 0 0 auto; }
+	.admin-top-actions { gap: 0.15rem; }
+	.admin-user, .admin-top-action[data-secondary="true"] { display: none; }
+	.admin-main { padding-block: 1.25rem 3rem; }
+	.admin-page-header { align-items: flex-start; flex-direction: column; margin-bottom: 1.1rem; }
+	.admin-page-actions { width: 100%; }
+	.admin-page-actions .admin-btn { flex: 1; }
+	.admin-stat-strip { gap: 0.5rem; }
+	.admin-stat { padding: 0.7rem; }
+	.admin-stat-label { font-size: 0.65rem; }
+	.admin-stat-value { font-size: 1.05rem; }
+	.admin-toolbar { align-items: stretch; flex-direction: column; }
+	.admin-search-wrap { max-width: none; }
+	.admin-toolbar-note { order: 2; }
+	.admin-table-wrap { display: none; }
+	.admin-mobile-posts { display: flex; flex-direction: column; gap: 0.55rem; padding: 0.65rem; }
+	.admin-mobile-post { padding: 0.85rem; border: 1px solid var(--admin-border); border-radius: 0.75rem; background: color-mix(in oklch, var(--admin-surface) 86%, var(--page-bg)); }
+	.admin-mobile-post-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.65rem; color: var(--admin-muted); font-size: 0.7rem; }
+	.admin-mobile-post-actions { display: flex; gap: 0.4rem; margin-top: 0.8rem; }
+	.admin-mobile-post-actions .admin-btn { flex: 1; }
+	.admin-editor-grid { grid-template-columns: minmax(0, 1fr); }
+	.admin-sticky-card { position: static; }
+	.admin-editor-title-input { min-height: 3rem; }
+	.admin-textarea[name="body_md"] { min-height: 22rem; }
+	.admin-login-card .admin-section-card-body { padding: 1.25rem; }
 }
 
-.admin-btn:hover { background: var(--btn-regular-bg-hover); }
-.admin-btn:active { background: var(--btn-regular-bg-active); }
-.admin-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.admin-btn-primary {
-	background: var(--primary);
-	color: white;
-}
-
-.admin-btn-primary:hover { filter: brightness(1.06); }
-.admin-btn-primary:active { filter: brightness(0.96); }
-
-.admin-btn-danger {
-	background: color-mix(in oklch, oklch(0.62 0.2 25) 14%, transparent);
-	color: oklch(0.52 0.2 25);
-}
-
-.admin-btn-danger:hover {
-	background: color-mix(in oklch, oklch(0.62 0.2 25) 22%, transparent);
-}
-
-/* 列表表格 */
-.admin-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 0.875rem;
-}
-
-.admin-table th {
-	text-align: left;
-	font-weight: 500;
-	font-size: 0.75rem;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--content-meta);
-	padding: 0.625rem 0.75rem;
-	border-bottom: 1px solid var(--line-divider);
-}
-
-.admin-table td {
-	padding: 0.75rem;
-	border-bottom: 1px solid var(--line-divider);
-	color: var(--deep-text);
-	vertical-align: middle;
-}
-
-.admin-table tbody tr:hover { background: var(--btn-card-bg-hover); }
-
-/* 状态徽标 */
-.admin-badge {
-	display: inline-flex;
-	align-items: center;
-	padding: 0.125rem 0.5rem;
-	border-radius: 999px;
-	font-size: 0.6875rem;
-	font-weight: 600;
-	line-height: 1.5;
-}
-
-.admin-badge-draft {
-	background: color-mix(in oklch, oklch(0.7 0.12 80) 20%, transparent);
-	color: oklch(0.5 0.12 70);
-}
-
-.admin-badge-live {
-	background: color-mix(in oklch, oklch(0.65 0.15 150) 18%, transparent);
-	color: oklch(0.45 0.13 150);
-}
-
-.admin-badge-pinned {
-	background: color-mix(in oklch, var(--primary) 18%, transparent);
-	color: var(--primary);
-}
-
-/* 消息提示 */
-.admin-alert {
-	padding: 0.625rem 0.875rem;
-	border-radius: calc(var(--radius-large) - 0.5rem);
-	font-size: 0.875rem;
-}
-
-.admin-alert-error {
-	background: color-mix(in oklch, oklch(0.62 0.2 25) 12%, transparent);
-	color: oklch(0.5 0.2 25);
-}
-
-.admin-alert-ok {
-	background: color-mix(in oklch, oklch(0.65 0.15 150) 14%, transparent);
-	color: oklch(0.42 0.13 150);
-}
-
-/* 编辑器双栏：左侧正文，右侧元信息 */
-.admin-editor-grid {
-	display: grid;
-	gap: 1rem;
-	grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 1024px) {
-	.admin-editor-grid {
-		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-	}
-}
-
-/* 登录页居中卡片 */
-.admin-login-wrap {
-	min-height: 100vh;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 1.5rem;
-	background: var(--page-bg);
-}
-
-.admin-login-card {
-	width: 100%;
-	max-width: 24rem;
+@media (prefers-reduced-motion: reduce) {
+	.admin-shell *, .admin-shell *::before, .admin-shell *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }

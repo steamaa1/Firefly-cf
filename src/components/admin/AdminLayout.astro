@@ -1,11 +1,5 @@
 ---
-/**
- * 后台统一布局。
- *
- * 复用主站 Layout 提供的 HTML 外壳（主题初始化、字体、CSS 变量），
- * 因此后台的配色、圆角、字体与前台完全一致；但不带侧边栏与背景壁纸，
- * 保持管理界面的信息密度。
- */
+/** 后台统一布局：复用主站主题初始化，但使用专属工作台导航与层级。 */
 import Layout from "@/layouts/Layout.astro";
 import "@/styles/admin.css";
 import { siteConfig } from "@/config/siteConfig";
@@ -13,20 +7,12 @@ import { url } from "@/utils/url-utils";
 
 interface Props {
 	title?: string;
-	/** 当前高亮的导航项 */
 	active?: "posts" | "new";
-	/** 是否已登录；false 时只渲染内容区（登录页用） */
 	authed?: boolean;
 	username?: string;
 }
 
-const {
-	title = "后台管理",
-	active,
-	authed = true,
-	username = "",
-} = Astro.props;
-
+const { title = "后台管理", active, authed = true, username = "" } = Astro.props;
 const navItems = [
 	{ key: "posts", label: "文章", href: url("/admin/") },
 	{ key: "new", label: "写文章", href: url("/admin/posts/new/") },
@@ -35,58 +21,36 @@ const navItems = [
 
 <Layout title={`${title} · ${siteConfig.title}`} description={title}>
 	<div class="admin-shell">
-		{
-			authed && (
-				<header class="border-b border-(--line-divider) bg-(--card-bg)">
-					<div class="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
-						<a href={url("/admin/")} class="text-base font-bold text-(--deep-text)">
-							后台管理
-						</a>
-						<nav class="flex items-center gap-1">
-							{navItems.map((item) => (
-								<a
-									href={item.href}
-									class:list={[
-										"rounded-lg px-3 py-1.5 text-sm transition-colors",
-										active === item.key
-											? "bg-(--btn-regular-bg) font-medium text-(--btn-content)"
-											: "text-black/65 hover:bg-(--btn-plain-bg-hover) hover:text-(--primary) dark:text-white/65",
-									]}
-								>
-									{item.label}
-								</a>
-							))}
-						</nav>
-						<div class="ml-auto flex items-center gap-3">
-							<a
-								href={url("/")}
-								class="text-sm text-black/60 hover:text-(--primary) dark:text-white/60"
-								target="_blank"
-								rel="noopener"
-							>
-								查看站点
+		{authed && (
+			<header class="admin-topbar">
+				<div class="admin-topbar-inner">
+					<a href={url("/admin/")} class="admin-brand" aria-label="Firefly 后台首页">
+						<span class="admin-brand-mark" aria-hidden="true">F</span>
+						<span>Firefly 后台</span>
+					</a>
+					<nav class="admin-nav" aria-label="后台主导航">
+						{navItems.map((item) => (
+							<a href={item.href} class="admin-nav-link" data-active={active === item.key} aria-current={active === item.key ? "page" : undefined}>
+								{item.label}
 							</a>
-							{username && (
-								<span class="text-sm text-black/50 dark:text-white/50">{username}</span>
-							)}
-							<button type="button" class="admin-btn" id="admin-logout">
-								退出
-							</button>
-						</div>
+						))}
+					</nav>
+					<div class="admin-top-actions">
+						<a href={url("/")} class="admin-top-action" data-secondary="true" target="_blank" rel="noopener">查看站点</a>
+						{username && <span class="admin-user" title={username}>{username}</span>}
+						<button type="button" class="admin-btn" id="admin-logout">退出</button>
 					</div>
-				</header>
-			)
-		}
-
-		<main class="mx-auto max-w-6xl px-4 py-6">
-			<slot />
-		</main>
+				</div>
+			</header>
+		)}
+		<main class="admin-main"><slot /></main>
 	</div>
 </Layout>
 
 <script>
 	const btn = document.getElementById("admin-logout");
 	btn?.addEventListener("click", async () => {
+		btn.setAttribute("disabled", "true");
 		try {
 			await fetch(`${import.meta.env.BASE_URL}api/admin/logout`, { method: "POST" });
 		} finally {

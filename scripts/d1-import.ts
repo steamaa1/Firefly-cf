@@ -12,6 +12,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import { glob } from "glob";
 import { createMarkdownProcessor } from "@astrojs/markdown-remark";
+import { buildRemarkPlugins, buildRehypePlugins } from "../src/utils/markdown-pipeline.ts";
 
 const CONTENT_DIR = "src/content";
 const OUT_DIR = "migrations";
@@ -35,6 +36,39 @@ function toDateStr(v: unknown): string {
 	return String(v);
 }
 
+/**
+ * 把文章封面图复制到 public/covers/，并返回站点可访问的绝对路径。
+ *
+ * 背景：原 frontmatter 里的 image 是相对路径（如 ./images/a.avif），
+ * 依赖文章文件的物理位置来解析。内容搬进 D1 后没有文件路径，
+ * 相对路径无法解析，封面就显示不出来。
+ * 这里在导入时把图片复制到 public 下并改写为固定 URL，
+ * 避免依赖构建期生成的带哈希文件名。
+ */
+const COVER_OUT_DIR = "public/covers";
+
+async function publishCover(rawImage: string, sourceFile: string): Promise<string> {
+	const image = (rawImage ?? "").trim();
+	if (!image) return "";
+	// 外链与已绝对化的路径原样保留
+	if (/^https?:\/\//i.test(image) || image.startsWith("/")) return image;
+
+	const dir = path.dirname(sourceFile);
+	const abs = path.resolve(dir, image);
+	try {
+		const buf = await fs.readFile(abs);
+		await fs.mkdir(COVER_OUT_DIR, { recursive: true });
+		// 用「原目录结构 + 文件名」避免不同文章的同名图片互相覆盖
+		const rel = path.relative("src/content", abs).split(path.sep).join("-");
+		const outName = rel.replace(/[^a-zA-Z0-9._-]/g, "-");
+		await fs.writeFile(path.join(COVER_OUT_DIR, outName), buf);
+		return `/covers/${outName}`;
+	} catch {
+		console.warn(`  ⚠️ 封面图缺失，已跳过：${image}（来自 ${sourceFile}）`);
+		return "";
+	}
+}
+
 async function main() {
 	const posts = await glob(`${CONTENT_DIR}/posts/**/*.md`, { nodir: true });
 	const mdx = await glob(`${CONTENT_DIR}/posts/**/*.mdx`, { nodir: true });
@@ -42,9 +76,14 @@ async function main() {
 	const projects = await glob(`${CONTENT_DIR}/projects/**/*.md`, { nodir: true });
 	const pages = await glob(`${CONTENT_DIR}/spec/**/*.{md,mdx}`, { nodir: true });
 
-	// 与站点共用同一套 markdown 管线；渲染发生在 Node 构建期，
-	// 因此 workerd 运行时只需读取 body_html，无需加载任何插件。
-	const processor = await createMarkdownProcessor({});
+	// 关键：必须传入与站点完全一致的插件链。
+	// 早前这里用的是 createMarkdownProcessor({})，等于空管线，
+	// 导致 KaTeX 公式、代码块框架、callouts、::github 指令、图表
+	// 等全部不渲染，线上表现为「Markdown 大片没生效」。
+	const processor = await createMarkdownProcessor({
+		remarkPlugins: buildRemarkPlugins() as never,
+		rehypePlugins: buildRehypePlugins() as never,
+	});
 
 	const lines: string[] = [
 		"-- 由 scripts/d1-import.ts 自动生成，勿手改",
@@ -75,6 +114,8 @@ async function main() {
 			: content;
 
 		const htmlPosts = await processor.render(bodyMd);
+		// 封面图相对路径在 D1 场景下无法解析，导入时发布到 public/ 并改写
+		const coverUrl = await publishCover(String(data.image ?? ""), f);
 
 		lines.push(
 			`INSERT INTO posts (slug,title,description,body_md,body_html,excerpt,image,category,lang,pinned,draft,comment,author,source_link,license_name,license_url,password,password_hint,series,series_order,word_count,published_at,updated_at) VALUES (` +
@@ -85,7 +126,7 @@ async function main() {
 					q(bodyMd),
 					q(htmlPosts.code),
 					q(String(data.description ?? "").slice(0, 200)),
-					q(String(data.image ?? "")),
+					q(coverUrl),
 					q(data.category ?? ""),
 					q(String(data.lang ?? "")),
 					b2i(data.pinned),
@@ -156,6 +197,7 @@ async function main() {
 		const rel = path.relative(`${CONTENT_DIR}/projects`, f).replace(/\.(md|mdx)$/, "");
 		const slug = String(data.slug || rel);
 		const htmlProj = await processor.render(content);
+		const projCover = await publishCover(String(data.image ?? ""), f);
 		lines.push(
 			`INSERT INTO projects (slug,title,description,body_md,body_html,image,status,lang,sort_order,draft,published_at) VALUES (` +
 				[
@@ -164,7 +206,7 @@ async function main() {
 					q(String(data.description ?? "")),
 					q(content),
 					q(htmlProj.code),
-					q(String(data.image ?? "")),
+					q(projCover),
 					q(String(data.status ?? "")),
 					q(String(data.lang ?? "")),
 					data.order === undefined ? "NULL" : String(Number(data.order)),
@@ -203,6 +245,8 @@ async function main() {
 			(l) => l.trim() && !l.startsWith("--") && !/^\s*DELETE\s/i.test(l),
 		),
 	};
+	// 不缩进输出：seed.json 只由服务端读取，体积从 ~1.6MB 降到约一半，
+	// 减少静态资源占用与部署时间。
 	await fs.mkdir("public", { recursive: true });
 	await fs.writeFile(
 		path.join("public", "seed.json"),
