@@ -39,14 +39,16 @@ Worker 运行时还需要以下绑定才能工作：
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "firefly",
-  "compatibility_date": "2025-10-01",
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
 
   "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    // 全站按需渲染，dist/client 内没有 HTML，必须让 Worker 优先接管请求
+    "run_worker_first": true,
+    "not_found_handling": "none"
   },
 
   "d1_databases": [
@@ -216,7 +218,8 @@ pnpm deploy                                   # 等价于 pnpm build && wrangler
 | `main: "@astrojs/cloudflare/entrypoints/server"` | Worker 入口，由适配器提供 |
 | `assets.directory: "./dist/client"` | 静态资源目录，必须是 client 子目录 |
 | `assets.binding: "ASSETS"` | 让 Worker 能读取静态资源 |
-| `assets.not_found_handling: "404-page"` | 未匹配路径返回自带的 `404.html` |
+| `assets.run_worker_first: true` | 所有请求先经 Worker。全站 SSR 时必需，否则导航请求会被静态资源拦截 |
+| `assets.not_found_handling: "none"` | 关闭 404.html 兜底；SSR 下没有该文件，开启会导致整站异常 |
 | `d1_databases[].binding: "DB"` | 代码中 `env.DB` 对应的绑定名 |
 | `compatibility_flags: ["nodejs_compat"]` | 构建/运行时的 Node API 兼容 |
 | `public/_headers` | 安全响应头 + 静态资源强缓存 |

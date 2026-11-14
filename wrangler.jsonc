@@ -3,7 +3,10 @@
 	// Worker 名称需与 Cloudflare 上 Workers Builds 里配置的一致，
 	// 否则部署时 CI 会强制覆盖成本项并尝试提 PR 修正。改名前先确认控制台里的名字。
 	"name": "firefly-cf",
-	"compatibility_date": "2025-10-01",
+	// 兼容日期需 >= 2025-04-01 才会启用导航请求的静态资源优先策略，
+	// 本项目实际用 run_worker_first 覆盖该行为（见下方 assets 注释）。
+	// 取 2026-10-01 以获得较新的运行时行为，升级前请确认 Worker 仍能正常部署。
+	"compatibility_date": "2026-10-01",
 	"compatibility_flags": ["nodejs_compat"],
 	// 后台与公开站同一 Worker：/admin 与 D1 驱动的内容走 Worker，
 	// 其余静态资源由 Cloudflare 直接托管。
