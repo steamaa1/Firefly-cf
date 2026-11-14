@@ -195,9 +195,13 @@ async function main() {
 	// 同时输出一份 JSON 到 public/，供 Worker 在「数据库为空」时自动播种。
 	// 放在 public/ 而不是打进 bundle，是为了避免 300KB 的示例内容进入 Worker 体积，
 	// 运行时通过 env.ASSETS 读取即可。
+	// 只保留 INSERT/建索引类语句：自动播种仅在空库时触发，
+	// 若保留脚本开头的 DELETE 清理语句，并发首次访问时可能误删刚写入的数据。
 	const seedPayload = {
 		generatedAt: new Date().toISOString(),
-		statements: lines.filter((l) => l.trim() && !l.startsWith("--")),
+		statements: lines.filter(
+			(l) => l.trim() && !l.startsWith("--") && !/^\s*DELETE\s/i.test(l),
+		),
 	};
 	await fs.mkdir("public", { recursive: true });
 	await fs.writeFile(
