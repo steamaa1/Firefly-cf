@@ -1,32 +1,24 @@
-import type { CollectionEntry } from "astro:content";
-import { getCollection } from "astro:content";
 import * as fs from "node:fs";
-import type { APIContext, GetStaticPaths } from "astro";
+import type { APIContext } from "astro";
 import type { FontDetails } from "takumi-js";
 import { ImageResponse } from "takumi-js/response";
 import { profileConfig } from "@/config/profileConfig";
 import { siteConfig } from "@/config/siteConfig";
-import { removeFileExtension } from "@/utils/url-utils";
+import { liveEntry } from "@/utils/live-content";
+import type { PostData } from "@/loaders/d1-posts";
 
-export const prerender = true;
-
-export const getStaticPaths: GetStaticPaths = async () => {
-	if (!siteConfig.post.generateOgImages) {
-		return [];
-	}
-
-	const allPosts = await getCollection("posts");
-	const publishedPosts = allPosts.filter((post) => !post.data.draft);
-
-	return publishedPosts.map((post) => {
-		// 将 id 转换为 slug（移除扩展名）以匹配路由参数
-		const slug = removeFileExtension(post.id);
-		return {
-			params: { slug: `${slug}.png` },
-			props: { post },
-		};
-	});
-};
+/**
+ * OG 图改为运行时生成（按需求「后台发布即时生效」）。
+ *
+ * 与之前构建期生成的区别：
+ * - 不再用 getStaticPaths 预生成，改为按请求的 slug 走 getLiveEntry 查 D1。
+ * - 因此新文章发布后立即可用，无需重建站点。
+ *
+ * 注意：字体与图片仍通过 node:fs 读取本地文件。Cloudflare Workers 在
+ * nodejs_compat 下支持部分 node:fs 读取随 Worker 打包的资源；若线上
+ * 出现读文件失败，请改用 R2 或把字体内联为 base64。
+ */
+export const prerender = false;
 
 // OG 图用的中文字体从 @fontsource 包本地读取，构建期不再请求 Google Fonts。
 // 该包把 CJK 按 unicode-range 切成百余个分片，Takumi 用 subsetOf + subsetRank 把它们
@@ -213,10 +205,22 @@ const loadImageAsArrayBuffer = async (
 	}
 };
 
-export async function GET({
-	props,
-}: APIContext<{ post: CollectionEntry<"posts"> }>): Promise<Response> {
-	const { post } = props;
+export async function GET({ params }: APIContext): Promise<Response> {
+	if (!siteConfig.post.generateOgImages) {
+		return new Response("OG image generation is disabled", { status: 404 });
+	}
+
+	// 路由参数形如 "my-post.png"，去掉扩展名得到文章 slug
+	const slug = String(params.slug ?? "").replace(/\.png$/i, "");
+	if (!slug) {
+		return new Response("Not found", { status: 404 });
+	}
+
+	const live = await liveEntry<PostData, "posts">("posts", slug);
+	if (!live) {
+		return new Response("Post not found", { status: 404 });
+	}
+	const post = { id: live.id, data: live.data };
 
 	// Load and get static assets
 	let iconPath = "/favicon/favicon-dark-192.png";

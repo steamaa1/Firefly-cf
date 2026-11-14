@@ -1,4 +1,5 @@
 import { setMaxListeners } from "node:events";
+import cloudflare from "@astrojs/cloudflare";
 import { unified } from "@astrojs/markdown-remark";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
@@ -10,6 +11,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, fontProviders } from "astro/config";
 import expressiveCode from "astro-expressive-code";
 import icon from "astro-icon";
+import iconInclude from "./src/constants/icon-include.json" with { type: "json" };
 import { pluginLanguageLogo } from "ec-lang-logo"; /* Language Logo */
 import { pluginCollapsible } from "expressive-code-collapsible"; /* Collapsible */
 import { pluginLanguageBadge } from "expressive-code-language-badge"; /* Language Badge */
@@ -58,10 +60,14 @@ if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
 
-// Firefly 是全站预渲染（SSG）的纯静态站点，不需要 Cloudflare adapter：
-// Astro 会把站点直接输出到 dist/，由 Cloudflare Workers 静态资源托管。
-// 启用 adapter 会把产物拆成 dist/client + dist/server，使 wrangler 的
-// assets.directory 指向一个不含 index.html 的目录，导致部署后 404。
+// 后台（/admin）与公开站都跑在 Cloudflare Workers 上：
+// - 公开站通过 Live Collections 实时读 D1，因此需要按需渲染（SSR）。
+// - 纯静态页（robots/sitemap/rss 等）仍用 export const prerender = true 预渲染。
+// adapter 会把产物拆成 dist/client（静态资源）+ dist/server（Worker 入口），
+// wrangler.jsonc 的 assets.directory 必须相应指向 ./dist/client。
+const adapter = cloudflare({
+	prerenderEnvironment: "node",
+});
 
 // https://astro.build/config
 export default defineConfig({
@@ -69,6 +75,10 @@ export default defineConfig({
 
 	base: "/",
 	trailingSlash: "always",
+
+	// 全站默认按需渲染：内容来自 D1（Live Collections），只能在请求时读取。
+	// 需要静态化的页面/接口用 export const prerender = true 单独声明。
+	output: "server",
 
 	// 字体配置 - 只加载实际使用的字体，跳过未引用的以加快构建
 	fonts: (() => {
@@ -105,6 +115,8 @@ export default defineConfig({
 				return { ...f, provider };
 			});
 	})(),
+
+	adapter,
 
 	// 图像优化配置
 	image: {
@@ -144,16 +156,12 @@ export default defineConfig({
 				return event.state?.url?.includes("#");
 			},
 		}),
+		// SSR 模式下 astro-icon 默认把每个图标集的全部图标打进 server bundle
+		// （实测约 20MB）。这里改用 scripts/gen-icon-include.ts 自动扫描生成的
+		// 白名单，只保留项目真正引用的图标。
+		// 新增图标后执行：npx tsx scripts/gen-icon-include.ts --write
 		icon({
-			include: {
-				"material-symbols": ["*"],
-				"fa7-brands": ["*"],
-				"fa7-regular": ["*"],
-				"fa7-solid": ["*"],
-				"simple-icons": ["*"],
-				mdi: ["*"],
-				mingcute: ["*"],
-			},
+			include: iconInclude,
 		}),
 		expressiveCode({
 			themes: [expressiveCodeConfig.darkTheme, expressiveCodeConfig.lightTheme],

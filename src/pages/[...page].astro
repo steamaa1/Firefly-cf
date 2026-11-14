@@ -1,5 +1,4 @@
 ---
-import type { GetStaticPaths } from "astro";
 import Pagination from "@/components/common/Pagination.astro";
 import PostPage from "@/components/layout/PostPage.astro";
 import { siteConfig } from "@/config";
@@ -8,15 +7,44 @@ import { i18n } from "@/i18n/translation";
 import MainGridLayout from "@/layouts/MainGridLayout.astro";
 import "@/styles/banner-home.css";
 import { getSortedPosts } from "@/utils/content-utils";
-export const getStaticPaths = (async ({ paginate }) => {
-	const allBlogPosts = await getSortedPosts();
-	// 使用配置中的文章数量
-	const pageSize = siteConfig.pagination.postsPerPage;
-	return paginate(allBlogPosts, { pageSize });
-}) satisfies GetStaticPaths;
-// https://github.com/withastro/astro/issues/6507#issuecomment-1489916992
+/**
+ * 运行时分页：从 D1 取全部已发布文章后在内存里切片。
+ * 不再用 getStaticPaths + paginate，因此新文章无需重建即可出现在首页。
+ */
+export const prerender = false;
 
-const { page } = Astro.props;
+const allBlogPosts = await getSortedPosts();
+const pageSize = siteConfig.pagination.postsPerPage;
+
+// 路由形如 /2/，第 1 页为 /（page 参数为 undefined）
+const pageParam = Number(Astro.params.page ?? "1");
+const currentPage =
+	Number.isFinite(pageParam) && pageParam >= 1 ? Math.floor(pageParam) : 1;
+
+const total = allBlogPosts.length;
+const start = (currentPage - 1) * pageSize;
+const pageItems = allBlogPosts.slice(start, start + pageSize);
+
+if (currentPage > 1 && pageItems.length === 0) {
+	return Astro.rewrite("/404/");
+}
+
+// 构造与原 paginate() 返回值结构一致的 page 对象，
+// 使 PostPage / Pagination 组件无需改动。
+const page = {
+	data: pageItems,
+	currentPage,
+	size: pageSize,
+	total,
+	start: start,
+	end: start + pageItems.length,
+	url: {
+		current: currentPage === 1 ? "/" : `/${currentPage}/`,
+		prev: currentPage > 1 ? (currentPage === 2 ? "/" : `/${currentPage - 1}/`) : undefined,
+		next: start + pageSize < total ? `/${currentPage + 1}/` : undefined,
+	},
+	lastPage: Math.max(1, Math.ceil(total / pageSize)),
+};
 
 const len = page.data.length;
 

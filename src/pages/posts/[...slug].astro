@@ -1,5 +1,7 @@
 ---
 import { render } from "astro:content";
+import { liveEntry } from "@utils/live-content";
+import type { PostData } from "@/loaders/d1-posts";
 import Comment from "@components/comment/index.astro";
 import Markdown from "@components/common/Markdown.astro";
 import EncryptedPost from "@components/features/EncryptedPost.astro";
@@ -52,19 +54,19 @@ const showSponsorButton =
 	sponsorConfig.showButtonInPost && siteConfig.pages.sponsor;
 const showPostActionCard = siteConfig.post.share || showSponsorButton;
 
-export async function getStaticPaths() {
-	const blogEntries = await getSortedPosts();
-	return blogEntries.map((entry) => {
-		// 将 id 转换为 slug（移除扩展名）以匹配路由参数
-		const slug = removeFileExtension(entry.id);
-		return {
-			params: { slug },
-			props: { entry },
-		};
-	});
+/**
+ * 运行时按需渲染：直接从 D1 取当前 slug 的文章，不再构建期枚举。
+ * 这样后台发布后立即可见，无需重建站点。
+ */
+export const prerender = false;
+
+const slugParam = String(Astro.params.slug ?? "").replace(/\/$/, "");
+const entry = await liveEntry<PostData, "posts">("posts", slugParam);
+
+if (!entry) {
+	return Astro.rewrite("/404/");
 }
 
-const { entry } = Astro.props;
 const { Content, headings } = await render(entry);
 
 const { remarkPluginFrontmatter } = await render(entry);

@@ -3,12 +3,23 @@
 	"name": "firefly",
 	"compatibility_date": "2025-10-01",
 	"compatibility_flags": ["nodejs_compat"],
-	// Firefly 是全站预渲染的纯静态站点，构建产物直接落在 ./dist。
-	// 纯静态站不需要 Worker 入口，因此这里不设置 main。
+	// 后台与公开站同一 Worker：/admin 与 D1 驱动的内容走 Worker，
+	// 其余静态资源由 Cloudflare 直接托管。
+	"main": "@astrojs/cloudflare/entrypoints/server",
 	"assets": {
-		"directory": "./dist",
+		"directory": "./dist/client",
+		"binding": "ASSETS",
 		"not_found_handling": "404-page"
 	},
+	// 只写 binding 名、不填 database_id：wrangler 4.45+ 会在首次部署时
+	// 自动创建数据库并回填 ID，实现 fork 后零配置即可部署。
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "firefly-cms",
+			"migrations_dir": "migrations"
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

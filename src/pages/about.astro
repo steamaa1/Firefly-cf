@@ -1,6 +1,7 @@
 ---
 
-import { getEntry, render } from "astro:content";
+import { render } from "astro:content";
+import { liveEntry } from "@utils/live-content";
 import Markdown from "@components/common/Markdown.astro";
 import { profileConfig } from "@/config/profileConfig";
 import { siteConfig } from "@/config/siteConfig";
@@ -10,7 +11,7 @@ import MainGridLayout from "@/layouts/MainGridLayout.astro";
 import { getAuthorAvatarUrl } from "@/utils/schema-image";
 import { buildProfilePage } from "@/utils/schema-utils";
 
-const aboutPost = await getEntry("spec", "about");
+const aboutPost = await liveEntry<Record<string, never>, "pages">("pages", "about");
 
 if (!aboutPost) {
 	throw new Error("About page content not found");

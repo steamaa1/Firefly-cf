@@ -6,7 +6,9 @@ import type { APIContext } from "astro";
 import { siteConfig } from "@/config";
 import pkg from "../../package.json";
 
-export const prerender = true;
+// 这些接口依赖 D1 内容（文章列表/站点信息），改为运行时生成，
+// 保证后台发布后 RSS/Atom/llms.txt 立即可反映最新内容。
+export const prerender = false;
 
 export async function GET(context: APIContext): Promise<Response> {
 	const includeContent = (siteConfig.feed?.contentMode ?? "full") === "full";

@@ -1,12 +1,15 @@
-import { type CollectionEntry, getCollection } from "astro:content";
+import { liveCollection, type LiveEntryLike } from "@utils/live-content";
+import type { PostData } from "@/loaders/d1-posts";
+import type { ProjectData } from "@/loaders/d1-others";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import { getCategoryUrl } from "@utils/url-utils";
 
 // // Retrieve posts and sort them by publication date
 async function getRawSortedPosts() {
-	const allBlogPosts = await getCollection("posts", ({ data }) => {
-		return import.meta.env.PROD ? data.draft !== true : true;
+	// Live Collection：只取已发布内容（草稿不进列表）
+	const allBlogPosts = await liveCollection<PostData, "posts">("posts", {
+		publishedOnly: true,
 	});
 
 	const sorted = allBlogPosts.sort((a, b) => {
@@ -22,7 +25,7 @@ async function getRawSortedPosts() {
 	return sorted;
 }
 
-export async function getSortedPosts(): Promise<CollectionEntry<"posts">[]> {
+export async function getSortedPosts(): Promise<LiveEntryLike<PostData, "posts">[]> {
 	const sorted = await getRawSortedPosts();
 
 	for (let i = 1; i < sorted.length; i++) {
@@ -38,7 +41,7 @@ export async function getSortedPosts(): Promise<CollectionEntry<"posts">[]> {
 }
 export type PostForList = {
 	id: string;
-	data: CollectionEntry<"posts">["data"];
+	data: PostData;
 };
 export async function getSortedPostsList(): Promise<PostForList[]> {
 	const sortedFullPosts = await getRawSortedPosts();
@@ -57,11 +60,9 @@ export async function getSortedPostsList(): Promise<PostForList[]> {
  * 排序规则：手动 order 降序（越大越靠前，未设置排最后）→ 发布时间降序 → 标题兜底
  * 注意：判断 order 是否设置必须用 !== undefined，否则 0 会被当作「未设置」排到最后
  */
-export async function getSortedProjects(): Promise<
-	CollectionEntry<"projects">[]
-> {
-	const allProjects = await getCollection("projects", ({ data }) => {
-		return import.meta.env.PROD ? data.draft !== true : true;
+export async function getSortedProjects(): Promise<LiveEntryLike<ProjectData, "projects">[]> {
+	const allProjects = await liveCollection<ProjectData, "projects">("projects", {
+		publishedOnly: true,
 	});
 
 	return allProjects.sort((a, b) => {
@@ -108,7 +109,7 @@ function sortBySeriesOrder(a: PostForList, b: PostForList): number {
  * 文章未设置 series 时返回 null（文章页不渲染系列导航盒）
  */
 export async function getSeriesPosts(
-	currentPost: CollectionEntry<"posts">,
+	currentPost: LiveEntryLike<PostData, "posts">,
 ): Promise<{
 	seriesName: string;
 	posts: PostForList[];
@@ -157,8 +158,8 @@ export type Tag = {
 };
 
 export async function getTagList(): Promise<Tag[]> {
-	const allBlogPosts = await getCollection<"posts">("posts", ({ data }) => {
-		return import.meta.env.PROD ? data.draft !== true : true;
+	const allBlogPosts = await liveCollection<PostData, "posts">("posts", {
+		publishedOnly: true,
 	});
 
 	const countMap: { [key: string]: number } = {};
@@ -184,8 +185,8 @@ export type Category = {
 };
 
 export async function getCategoryList(): Promise<Category[]> {
-	const allBlogPosts = await getCollection<"posts">("posts", ({ data }) => {
-		return import.meta.env.PROD ? data.draft !== true : true;
+	const allBlogPosts = await liveCollection<PostData, "posts">("posts", {
+		publishedOnly: true,
 	});
 	const count: { [key: string]: number } = {};
 	allBlogPosts.forEach((post: { data: { category: string | null } }) => {
@@ -257,11 +258,11 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
  * - categoryBonus (0 or 10): 同分类加 10 分
  */
 export async function getRelatedPosts(
-	currentPost: CollectionEntry<"posts">,
+	currentPost: LiveEntryLike<PostData, "posts">,
 	maxCount = 5,
 ): Promise<PostForList[]> {
-	const allPosts = await getCollection<"posts">("posts", ({ data }) => {
-		return import.meta.env.PROD ? data.draft !== true : true;
+	const allPosts = await liveCollection<PostData, "posts">("posts", {
+		publishedOnly: true,
 	});
 
 	// 排除自身和加密文章

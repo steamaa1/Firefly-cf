@@ -109,12 +109,31 @@ const search = async (keyword: string, isDesktop: boolean): Promise<void> => {
 		try {
 			let searchResults: SearchResult[] = [];
 
-			if (import.meta.env.PROD && window.pagefind) {
-				const response = await window.pagefind.search(keyword);
-				searchResults = await Promise.all(
-					response.results.map((item) => item.data()),
+			// 站点已改为运行时渲染（内容来自 D1），Pagefind 在构建期没有 HTML 可索引，
+			// 因此搜索改走 /api/search.json（D1 关键词检索）。
+			// 开发环境同样走该接口；若接口不可用则回退到示例数据。
+			try {
+				const res = await fetch(
+					`${import.meta.env.BASE_URL}api/search.json?q=${encodeURIComponent(keyword)}`,
 				);
-			} else if (import.meta.env.DEV) {
+				if (res.ok) {
+					const data = (await res.json()) as {
+						results?: Array<{
+							slug: string;
+							title: string;
+							excerpt: string;
+							description?: string;
+						}>;
+					};
+					searchResults = (data.results ?? []).map((r) => ({
+						url: `/posts/${r.slug}/`,
+						meta: { title: r.title },
+						excerpt: r.excerpt || r.description || "",
+					})) as SearchResult[];
+				} else {
+					searchResults = fakeResult;
+				}
+			} catch {
 				searchResults = fakeResult;
 			}
 

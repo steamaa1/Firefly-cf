@@ -69,3 +69,50 @@ Pagefind 索引由 `pnpm build` 末尾的 `scripts/run-pagefind.ts` 生成到 `d
 **构建时字体下载失败**
 Astro Fonts API 会在构建期从 CDN 拉取字体。网络不稳定时重试即可，已下载的字体会缓存在
 `node_modules/.astro/fonts/`，重跑会跳过已缓存部分。
+
+---
+
+# 后台与 D1 架构（当前版本）
+
+本版本引入后台管理，内容存 Cloudflare D1，公开站通过 Astro Live Collections 实时读取。
+
+## 与纯静态版的区别
+
+| 项目 | 纯静态版 | 当前版本 |
+| --- | --- | --- |
+| 渲染 | 全站构建期预渲染 | 全站运行时光渲染（`output: "server"`） |
+| 内容来源 | `src/content/**` 文件 | D1 数据库 |
+| 发布生效 | 需重新部署 | 后台保存即生效 |
+| 搜索 | Pagefind 静态索引 | D1 关键词检索（`/api/search.json`） |
+| wrangler | `assets: ./dist`，无 main | `main: 适配器入口`，`assets: ./dist/client` |
+
+## 首次部署步骤
+
+```bash
+pnpm install
+pnpm build                      # 末尾会生成 migrations/0002_seed_content.sql
+npx wrangler d1 create firefly-cms   # 若用自动供应可跳过
+npx wrangler d1 migrations apply firefly-cms --remote
+npx wrangler deploy
+```
+
+`wrangler.jsonc` 中刻意只写 `database_name` 不写 `database_id`，
+依赖 wrangler 4.45+ 的自动资源供应，fork 后无需手工建库。
+
+## 内容渲染策略（重要）
+
+正文在**导入/保存时**就用完整的 markdown 管线渲染成 `body_html` 存入 D1，
+运行时只输出字符串。这样 Mermaid/PlantUML/KaTeX/Expressive Code 等
+依赖 Node 与 WASM 的插件不需要在 workerd 中运行，兼容性风险为零。
+
+修改文章后需重新执行 `npx tsx scripts/d1-import.ts` 生成新 SQL 并 apply，
+或在后台保存时由服务端渲染（后台功能落地后启用）。
+
+## 已知限制
+
+- **Worker 体积约 8.9 MB**（已优化：图标白名单 + 移除运行时 markdown 渲染，原为 39.9 MB）。
+- **新增图标需重新生成白名单**：在源码或配置中用到新图标后，执行 `pnpm icons`，
+  否则 SSR 页面里该图标会缺失。图标集中在 `src/constants/icon-include.json`。
+- **免费版 CPU 限制 10 ms**：SSR 渲染较重，若频繁触发 1102 错误需升级 Workers Paid。
+- **MDX 不支持**：Live Collections 无法运行 MDX，`mdx-example.mdx` 与 `friends.mdx` 导入时按纯文本处理。
+- **Pagefind 已移除**：构建期无 HTML 可索引，搜索改由 D1 提供。

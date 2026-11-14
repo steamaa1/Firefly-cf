@@ -1,5 +1,6 @@
 ---
-import { getEntry, render } from "astro:content";
+import { render } from "astro:content";
+import { liveEntry } from "@utils/live-content";
 import Comment from "@components/comment/index.astro";
 import Markdown from "@components/common/Markdown.astro";
 import { Icon } from "astro-icon/components";
@@ -14,7 +15,7 @@ if (!siteConfig.pages.guestbook) {
 	return Astro.redirect("/404/");
 }
 
-const guestbookPost = await getEntry("spec", "guestbook");
+const guestbookPost = await liveEntry<Record<string, never>, "pages">("pages", "guestbook");
 
 if (!guestbookPost) {
 	throw new Error("guestbook page content not found");

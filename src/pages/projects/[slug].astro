@@ -1,4 +1,6 @@
 ---
+import { liveEntry } from "@utils/live-content";
+import type { ProjectData } from "@/loaders/d1-others";
 import { render } from "astro:content";
 import Markdown from "@components/common/Markdown.astro";
 import { Icon } from "astro-icon/components";
@@ -26,15 +28,16 @@ if (!siteConfig.pages.projects) {
 	return Astro.redirect("/404/");
 }
 
-export async function getStaticPaths() {
-	const projects = await getSortedProjects();
-	return projects.map((entry) => ({
-		params: { slug: removeFileExtension(entry.id) },
-		props: { entry },
-	}));
+/** 运行时按需渲染：直接按 slug 从 D1 取项目，发布后无需重建。 */
+export const prerender = false;
+
+const slugParam = String(Astro.params.slug ?? "").replace(/\/$/, "");
+const entry = await liveEntry<ProjectData, "projects">("projects", slugParam);
+
+if (!entry) {
+	return Astro.rewrite("/404/");
 }
 
-const { entry } = Astro.props;
 const { Content, headings } = await render(entry);
 
 const { title, description, published, tags, link, status } = entry.data;

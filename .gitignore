@@ -7,6 +7,9 @@ public/vndb-covers/
 # generated types
 .astro/
 
+# D1 seed SQL（由 scripts/d1-import.ts 从 src/content 生成，随内容变化，不入库）
+migrations/0002_seed_content.sql
+
 # dependencies
 node_modules/
 

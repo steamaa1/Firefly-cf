@@ -1,6 +1,8 @@
 import type { APIRoute } from "astro";
 
-export const prerender = true;
+// 这些接口依赖 D1 内容（文章列表/站点信息），改为运行时生成，
+// 保证后台发布后 RSS/Atom/llms.txt 立即可反映最新内容。
+export const prerender = false;
 
 const robotsTxt = `
 User-agent: *
