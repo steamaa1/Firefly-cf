@@ -11,7 +11,17 @@
 	"assets": {
 		"directory": "./dist/client",
 		"binding": "ASSETS",
-		"not_found_handling": "404-page"
+		// 本项目是全站按需渲染：dist/client 里只有 CSS/JS/图片等静态资源，
+		// 没有任何 HTML 文件，所有页面都由 Worker 生成。
+		//
+		// 因此不能让静态资源优先接管「导航请求」：当 not_found_handling 生效
+		// 且兼容日期 >= 2025-04-01 时，Cloudflare 会把带 Sec-Fetch-Mode: navigate
+		// 的请求直接交给静态资源处理，匹配不到文件就去找 404.html——而 SSR 下
+		// 并不存在 404.html，结果就是整站导航异常。
+		// run_worker_first: true 让所有请求先经过 Worker，静态资源仍可通过
+		// env.ASSETS 读取（如 seed.json）。
+		"run_worker_first": true,
+		"not_found_handling": "none"
 	},
 	// 只写 binding 名、不填 database_id：wrangler 4.45+ 会在首次部署时
 	// 自动创建数据库并回填 ID，实现 fork 后零配置即可部署。
