@@ -1,5 +1,4 @@
 import { setMaxListeners } from "node:events";
-import cloudflare from "@astrojs/cloudflare";
 import { unified } from "@astrojs/markdown-remark";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
@@ -59,11 +58,10 @@ if (process.env.NODE_ENV === "development") {
 	setMaxListeners(20);
 }
 
-const adapter = process.env.CF_WORKERS
-	? cloudflare({
-			prerenderEnvironment: "node",
-		})
-	: undefined;
+// Firefly 是全站预渲染（SSG）的纯静态站点，不需要 Cloudflare adapter：
+// Astro 会把站点直接输出到 dist/，由 Cloudflare Workers 静态资源托管。
+// 启用 adapter 会把产物拆成 dist/client + dist/server，使 wrangler 的
+// assets.directory 指向一个不含 index.html 的目录，导致部署后 404。
 
 // https://astro.build/config
 export default defineConfig({
@@ -107,8 +105,6 @@ export default defineConfig({
 				return { ...f, provider };
 			});
 	})(),
-
-	adapter,
 
 	// 图像优化配置
 	image: {
