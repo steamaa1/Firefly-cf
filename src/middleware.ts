@@ -4,22 +4,32 @@
  * 2. 捕获渲染异常并把真实错误输出到响应，避免只看到 “[object Object]”
  */
 import { defineMiddleware } from "astro:middleware";
-import { ensureSchema } from "@/lib/auto-migrate";
+import { ensureSchema, ensureSeed } from "@/lib/auto-migrate";
 
 let warned = false;
 
 export const onRequest = defineMiddleware(async (context, next) => {
-	// --- 1. 自动建表 ---
+	// --- 1. 自动建表 + 首次播种示例内容 ---
 	try {
 		const { env } = await import("cloudflare:workers");
 		const db = env?.DB;
 		if (db) {
 			await ensureSchema(db as Parameters<typeof ensureSchema>[0]);
+			// 表建好后若没有任何文章，导入 public/seed.json 的示例内容，
+			// 让部署完的站点立刻有内容可看，无需手动执行 SQL。
+			const assets = env?.ASSETS;
+			if (assets) {
+				await ensureSeed(
+					db as Parameters<typeof ensureSeed>[0],
+					assets as Parameters<typeof ensureSeed>[1],
+					context.url.origin,
+				);
+			}
 		}
 	} catch (e) {
 		if (!warned) {
 			warned = true;
-			console.warn(`[middleware] 自动建表失败：${e instanceof Error ? e.message : String(e)}`);
+			console.warn(`[middleware] 初始化失败：${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 

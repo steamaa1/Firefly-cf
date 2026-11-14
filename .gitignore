@@ -9,6 +9,8 @@ public/vndb-covers/
 
 # D1 seed SQL（由 scripts/d1-import.ts 从 src/content 生成，随内容变化，不入库）
 migrations/0002_seed_content.sql
+# 自动播种用的示例内容，由 scripts/d1-import.ts 生成
+public/seed.json
 
 # dependencies
 node_modules/

@@ -192,8 +192,22 @@ async function main() {
 	const outFile = path.join(OUT_DIR, "0002_seed_content.sql");
 	await fs.writeFile(outFile, lines.join("\n") + "\n", "utf8");
 
+	// 同时输出一份 JSON 到 public/，供 Worker 在「数据库为空」时自动播种。
+	// 放在 public/ 而不是打进 bundle，是为了避免 300KB 的示例内容进入 Worker 体积，
+	// 运行时通过 env.ASSETS 读取即可。
+	const seedPayload = {
+		generatedAt: new Date().toISOString(),
+		statements: lines.filter((l) => l.trim() && !l.startsWith("--")),
+	};
+	await fs.mkdir("public", { recursive: true });
+	await fs.writeFile(
+		path.join("public", "seed.json"),
+		JSON.stringify(seedPayload),
+		"utf8",
+	);
+
 	console.log(
-		`✅ 导出 ${outFile}\n   posts=${postCount} dynamics=${dynCount} projects=${projCount} pages=${pageCount} tags=${tagSet.size}`,
+		`✅ 导出 ${outFile} 与 public/seed.json\n   posts=${postCount} dynamics=${dynCount} projects=${projCount} pages=${pageCount} tags=${tagSet.size}`,
 	);
 }
 

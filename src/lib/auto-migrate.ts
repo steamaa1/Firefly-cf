@@ -167,3 +167,66 @@ export async function ensureSchema(db: D1Like): Promise<void> {
 export function resetSchemaCache(): void {
 	migratePromise = null;
 }
+
+/* ---------------- 首次播种示例内容 ---------------- */
+
+type AssetsBinding = { fetch: (req: Request | string) => Promise<Response> };
+
+let seedPromise: Promise<void> | null = null;
+
+/**
+ * 数据库为空时导入 public/seed.json 中的示例内容。
+ *
+ * 参照 moments-cf 的做法：表为空即写入初始数据，用户部署完就有内容可看。
+ * 数据不打进 bundle，而是通过 ASSETS 绑定读取，避免 300KB 进入 Worker 体积。
+ * 只导入一次：导入后 posts 表非空，后续请求直接跳过。
+ */
+async function runSeed(db: D1Like, assets: AssetsBinding, origin: string): Promise<void> {
+	const count = await db
+		.prepare("SELECT COUNT(*) AS c FROM posts")
+		.first<{ c: number }>();
+
+	if ((count?.c ?? 0) > 0) {
+		return;
+	}
+
+	let statements: string[];
+	try {
+		const res = await assets.fetch(new URL("/seed.json", origin).toString());
+		if (!res.ok) {
+			console.warn(`[auto-seed] 未找到 seed.json（${res.status}），跳过示例内容导入`);
+			return;
+		}
+		const payload = (await res.json()) as { statements?: string[] };
+		statements = payload.statements ?? [];
+	} catch (e) {
+		console.warn(`[auto-seed] 读取 seed.json 失败：${e instanceof Error ? e.message : String(e)}`);
+		return;
+	}
+
+	if (statements.length === 0) {
+		console.log("[auto-seed] seed.json 为空，跳过");
+		return;
+	}
+
+	console.log(`[auto-seed] 数据库为空，开始导入示例内容（${statements.length} 条语句）…`);
+	for (const stmt of statements) {
+		await db.prepare(stmt).run();
+	}
+	const after = await db.prepare("SELECT COUNT(*) AS c FROM posts").first<{ c: number }>();
+	console.log(`[auto-seed] 导入完成，现有 ${after?.c ?? 0} 篇文章`);
+}
+
+export async function ensureSeed(
+	db: D1Like,
+	assets: AssetsBinding,
+	origin: string,
+): Promise<void> {
+	if (!seedPromise) {
+		seedPromise = runSeed(db, assets, origin).catch((e) => {
+			seedPromise = null;
+			throw e;
+		});
+	}
+	return seedPromise;
+}
