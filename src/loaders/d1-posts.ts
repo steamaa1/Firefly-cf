@@ -71,6 +71,12 @@ export type PostFilter = {
 	series?: string;
 };
 
+/** 从 Astro 传入的 filter 中取出主键：兼容 { id } 与 { slug } 两种形式 */
+function pickKey(filter: { id?: string; slug?: string } | undefined): string | undefined {
+	const v = filter?.id ?? filter?.slug;
+	return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
 const SELECT_BASE = `
 	SELECT p.id, p.slug, p.title, p.description, p.body_html, p.excerpt, p.image,
 	       p.category, p.lang, p.pinned, p.draft, p.comment, p.author,
@@ -126,7 +132,7 @@ async function loadTagsFor(db: Awaited<ReturnType<typeof getDb>>, ids: number[])
 	return map;
 }
 
-export const postsLoader: LiveLoader<PostData, { slug: string }, PostFilter> = {
+export const postsLoader: LiveLoader<PostData, { id?: string; slug?: string }, PostFilter> = {
 	name: "d1-posts",
 
 	async loadCollection({ filter }) {
@@ -176,9 +182,13 @@ export const postsLoader: LiveLoader<PostData, { slug: string }, PostFilter> = {
 	async loadEntry({ filter }) {
 		try {
 			const db = await getDb();
+			// Astro 把 getLiveEntry(name, "slug") 的字符串参数转成 { id: "slug" } 传入，
+			// 因此这里同时兼容 id 与 slug 两种写法，避免绑定到 undefined 触发 D1_TYPE_ERROR。
+			const key = pickKey(filter);
+			if (!key) return undefined;
 			const row = await db
 				.prepare(SELECT_BASE + " WHERE p.slug = ?")
-				.bind(filter.slug)
+				.bind(key)
 				.first<PostRow>();
 			if (!row) return undefined;
 

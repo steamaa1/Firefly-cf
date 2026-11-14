@@ -5,6 +5,12 @@
 import type { LiveLoader } from "astro/loaders";
 import { getDb, toBool, toDate } from "./d1-core";
 
+/** Astro 把 getLiveEntry(name, "key") 的字符串转成 { id: "key" } 传入，这里兼容两种写法 */
+function pickKey(filter: { id?: string; slug?: string } | undefined): string | undefined {
+	const v = filter?.id ?? filter?.slug;
+	return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
 /* ---------------- dynamics ---------------- */
 
 export type DynamicData = {
@@ -22,7 +28,7 @@ type DynRow = {
 	published_at: string;
 };
 
-export const dynamicsLoader: LiveLoader<DynamicData, { slug: string }> = {
+export const dynamicsLoader: LiveLoader<DynamicData, { id?: string; slug?: string }> = {
 	name: "d1-dynamics",
 
 	async loadCollection() {
@@ -54,11 +60,13 @@ export const dynamicsLoader: LiveLoader<DynamicData, { slug: string }> = {
 	async loadEntry({ filter }) {
 		try {
 			const db = await getDb();
+			const key = pickKey(filter);
+			if (!key) return undefined;
 			const r = await db
 				.prepare(
 					"SELECT slug, body_md, body_html, location, pinned, published_at FROM dynamics WHERE slug = ?",
 				)
-				.bind(filter.slug)
+				.bind(key)
 				.first<DynRow>();
 			if (!r) return undefined;
 			return {
@@ -122,7 +130,7 @@ function projToData(r: ProjRow, tags: string[]): ProjectData {
 	};
 }
 
-export const projectsLoader: LiveLoader<ProjectData, { slug: string }, { publishedOnly?: boolean }> = {
+export const projectsLoader: LiveLoader<ProjectData, { id?: string; slug?: string }, { publishedOnly?: boolean }> = {
 	name: "d1-projects",
 
 	async loadCollection({ filter }) {
@@ -169,12 +177,14 @@ export const projectsLoader: LiveLoader<ProjectData, { slug: string }, { publish
 	async loadEntry({ filter }) {
 		try {
 			const db = await getDb();
+			const key = pickKey(filter);
+			if (!key) return undefined;
 			const r = await db
 				.prepare(
 					`SELECT p.id, p.slug, p.title, p.description, p.body_html, p.image, p.status, p.lang, p.sort_order, p.draft, p.published_at
 					 FROM projects p WHERE p.slug = ?`,
 				)
-				.bind(filter.slug)
+				.bind(key)
 				.first<ProjRow>();
 			if (!r) return undefined;
 			return {
@@ -192,7 +202,7 @@ export const projectsLoader: LiveLoader<ProjectData, { slug: string }, { publish
 
 type PageRow = { slug: string; body_html: string };
 
-export const pagesLoader: LiveLoader<Record<string, never>, { slug: string }> = {
+export const pagesLoader: LiveLoader<Record<string, never>, { id?: string; slug?: string }> = {
 	name: "d1-pages",
 
 	async loadCollection() {
@@ -216,9 +226,11 @@ export const pagesLoader: LiveLoader<Record<string, never>, { slug: string }> = 
 	async loadEntry({ filter }) {
 		try {
 			const db = await getDb();
+			const key = pickKey(filter);
+			if (!key) return undefined;
 			const r = await db
 				.prepare("SELECT slug, body_html FROM pages WHERE slug = ?")
-				.bind(filter.slug)
+				.bind(key)
 				.first<PageRow>();
 			if (!r) return undefined;
 			return {
