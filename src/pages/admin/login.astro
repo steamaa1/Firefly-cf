@@ -32,61 +32,67 @@ try {
 ---
 
 <AdminLayout title="登录" authed={false}>
-	<div class="admin-login-wrap" style="min-height: 70vh;">
-		<div class="admin-login-card card-base p-7">
-			<h1 class="mb-1 text-xl font-bold text-(--deep-text)">后台登录</h1>
-			<p class="mb-6 text-sm text-black/55 dark:text-white/55">
-				{needsSetup
-					? hasSetupToken
-						? "首次使用：请创建管理员账号，并填写初始化令牌。"
-						: "首次使用：输入用户名与密码即可创建管理员账号。"
-					: "请输入管理员账号与密码。"}
-			</p>
+	<div class="admin-login-wrap">
+		<section class="admin-section-card admin-login-card">
+			<div class="admin-section-card-body">
+				<div class="admin-brand admin-login-mark">
+					<span class="admin-brand-mark" aria-hidden="true">F</span>
+					<span>Firefly 后台</span>
+				</div>
+				<h1 class="admin-page-title" style="font-size: 1.4rem;">后台登录</h1>
+				<p class="admin-page-description mb-6">
+					{needsSetup
+						? hasSetupToken
+							? "首次使用：请创建管理员账号，并填写初始化令牌。"
+							: "首次使用：输入用户名与密码即可创建管理员账号。"
+						: "请输入管理员账号与密码。"}
+				</p>
 
-			<div id="login-error" class="admin-alert admin-alert-error mb-4 hidden"></div>
+				<div id="login-error" class="admin-alert admin-alert-error mb-4 hidden" role="alert"></div>
 
-			<form id="login-form" class="flex flex-col gap-4">
-				<label class="admin-field">
-					<span class="admin-label">用户名</span>
-					<input
-						class="admin-input"
-						type="text"
-						name="username"
-						autocomplete="username"
-						required
-					/>
-				</label>
+				<form id="login-form" class="flex flex-col gap-4">
+					<label class="admin-field">
+						<span class="admin-label">用户名</span>
+						<input
+							class="admin-input"
+							type="text"
+							name="username"
+							autocomplete="username"
+							required
+						/>
+					</label>
 
-				<label class="admin-field">
-					<span class="admin-label">密码</span>
-					<input
-						class="admin-input"
-						type="password"
-						name="password"
-						autocomplete={needsSetup ? "new-password" : "current-password"}
-						required
-					/>
-				</label>
+					<label class="admin-field">
+						<span class="admin-label">密码</span>
+						<input
+							class="admin-input"
+							type="password"
+							name="password"
+							autocomplete={needsSetup ? "new-password" : "current-password"}
+							required
+						/>
+					</label>
 
-				{
-					needsSetup && hasSetupToken && (
-						<label class="admin-field">
-							<span class="admin-label">初始化令牌（环境变量 ADMIN_SETUP_TOKEN）</span>
-							<input
-								class="admin-input"
-								type="password"
-								name="setupToken"
-								required
-							/>
-						</label>
-					)
-				}
+					{
+						needsSetup && hasSetupToken && (
+							<label class="admin-field">
+								<span class="admin-label">初始化令牌（环境变量 ADMIN_SETUP_TOKEN）</span>
+								<input
+									class="admin-input"
+									type="password"
+									name="setupToken"
+									required
+								/>
+							</label>
+						)
+					}
 
-				<button type="submit" class="admin-btn admin-btn-primary mt-2" id="login-submit">
-					登录
-				</button>
-			</form>
-		</div>
+					<button type="submit" class="admin-btn admin-btn-primary mt-2" id="login-submit">
+						登录
+					</button>
+				</form>
+			</div>
+		</section>
 	</div>
 </AdminLayout>
 

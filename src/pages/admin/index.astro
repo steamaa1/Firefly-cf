@@ -51,23 +51,59 @@ function fmtDate(v: string): string {
 	const input = document.getElementById("search-input") as HTMLInputElement | null;
 	const note = document.getElementById("search-note");
 	const noResults = document.getElementById("no-results");
+	const emptyState = document.getElementById("empty-state");
+	const views = document.getElementById("posts-views");
 
-	function updateSearch() {
-		const q = input?.value.trim().toLowerCase() ?? "";
-		const items = document.querySelectorAll<HTMLElement>("[data-title][data-slug]");
-		let visible = 0;
-		items.forEach((item) => {
-			const hit = !q || (item.dataset.title ?? "").includes(q) || (item.dataset.slug ?? "").toLowerCase().includes(q);
-			item.hidden = !hit;
-			if (hit) visible++;
-		});
-		if (note) note.textContent = q ? `找到 ${visible} 篇` : `显示全部 ${visible} 篇`;
-		noResults?.classList.toggle("hidden", visible > 0);
+	/** 表格行是唯一数据源：移动卡片只是同一批数据的第二视图，不能重复计数 */
+	function dataRows(): HTMLElement[] {
+		return Array.from(document.querySelectorAll<HTMLElement>("#post-tbody tr[data-slug]"));
 	}
 
-	input?.addEventListener("input", updateSearch);
+	function setStat(key: string, value: number) {
+		const el = document.querySelector<HTMLElement>(`[data-stat="${key}"]`);
+		if (el) el.textContent = String(value);
+	}
 
-	// 删除：二次确认后调用 API
+	/** 筛选与删除后同步统计条、计数文案、无结果提示与空态 */
+	function refresh(): { total: number; visible: number } {
+		const rows = dataRows();
+		const total = rows.length;
+		const drafts = rows.filter((row) => row.dataset.draft === "1").length;
+		setStat("total", total);
+		setStat("live", total - drafts);
+		setStat("draft", drafts);
+
+		const isEmpty = total === 0;
+		views?.classList.toggle("hidden", isEmpty);
+		emptyState?.classList.toggle("hidden", !isEmpty);
+
+		const q = input?.value.trim().toLowerCase() ?? "";
+		const matches = (el: HTMLElement) =>
+			!q || (el.dataset.title ?? "").includes(q) || (el.dataset.slug ?? "").toLowerCase().includes(q);
+
+		let visible = 0;
+		for (const row of rows) {
+			const hit = matches(row);
+			row.hidden = !hit;
+			if (hit) visible++;
+		}
+		// 移动端卡片与表格行保持同一筛选结果
+		for (const card of document.querySelectorAll<HTMLElement>("#mobile-posts [data-slug]")) {
+			card.hidden = !matches(card);
+		}
+
+		if (note) note.textContent = isEmpty ? "暂无文章" : q ? `找到 ${visible} 篇` : `显示全部 ${total} 篇`;
+		noResults?.classList.toggle("hidden", isEmpty || visible > 0);
+
+		return { total, visible };
+	}
+
+	input?.addEventListener("input", () => void refresh());
+
+	// 首次渲染即与脚本逻辑对齐：空博客时计数文案显示「暂无文章」而不是「显示全部 0 篇」
+	refresh();
+
+	// 删除：二次确认后调用 API，成功则同时移除表格行与移动卡片
 	document.querySelectorAll(".js-delete").forEach((btn) => {
 		btn.addEventListener("click", async () => {
 			const el = btn as HTMLButtonElement;
@@ -82,7 +118,17 @@ function fmtDate(v: string): string {
 				});
 				const data = (await res.json()) as { ok?: boolean; error?: string };
 				if (res.ok && data.ok) {
-					el.closest("tr")?.remove();
+					// 同一 slug 在桌面表格与移动卡片里各有一份，必须一起移除
+					for (const node of document.querySelectorAll<HTMLElement>(
+						`[data-slug="${CSS.escape(slug)}"]`,
+					)) {
+						node.remove();
+					}
+					const { total, visible } = refresh();
+					if (note) {
+						note.textContent =
+							total === 0 ? "已删除最后一篇文章" : `已删除「${title}」，当前显示 ${visible} 篇`;
+					}
 					return;
 				}
 				alert(data.error ?? "删除失败");

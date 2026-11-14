@@ -40,142 +40,172 @@ const v = {
 };
 ---
 
-<div id="editor-alert" class="admin-alert admin-alert-error mb-4 hidden"></div>
-<div id="editor-ok" class="admin-alert admin-alert-ok mb-4 hidden"></div>
+<div id="editor-alert" class="admin-alert admin-alert-error mb-4 hidden" role="alert"></div>
+<div id="editor-ok" class="admin-alert admin-alert-ok mb-4 hidden" role="status" aria-live="polite"></div>
 
 <form id="post-form" data-edit={isEdit ? "1" : "0"} data-slug={v.slug}>
 	<div class="admin-editor-grid">
 		<!-- 左栏：标题 + 正文 -->
-		<div class="flex flex-col gap-4">
-			<div class="card-base p-5">
-				<label class="admin-field mb-4">
-					<span class="admin-label">标题</span>
-					<input
-						class="admin-input"
-						style="font-size: 1.0625rem; font-weight: 600;"
-						name="title"
-						value={v.title}
-						required
-					/>
-				</label>
-
-				<label class="admin-field">
-					<span class="admin-label">描述（摘要，用于列表与 SEO）</span>
-					<textarea class="admin-textarea" name="description" rows="2" style="min-height: 4rem; font-family: inherit;">{v.description}</textarea>
-				</label>
-			</div>
-
-			<div class="card-base p-5">
-				<div class="mb-2 flex items-center gap-2">
-					<span class="admin-label" style="margin: 0;">正文（Markdown）</span>
-					<button
-						type="button"
-						id="toggle-preview"
-						class="admin-btn ml-auto"
-						style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
-					>
-						切换预览
-					</button>
+		<div class="admin-editor-main">
+			<section class="admin-section-card">
+				<div class="admin-section-card-header">
+					<h2 class="admin-section-card-title">基本信息</h2>
 				</div>
-				<textarea
-					id="body-input"
-					class="admin-textarea"
-					name="body_md"
-					rows="24"
-					style="min-height: 32rem;"
-					placeholder="在这里写 Markdown 正文…">{v.body_md}</textarea>
+				<div class="admin-section-card-body">
+					<label class="admin-field mb-4">
+						<span class="admin-label">标题</span>
+						<input
+							class="admin-input admin-editor-title-input"
+							name="title"
+							value={v.title}
+							required
+						/>
+					</label>
 
-				<div id="preview-pane" class="hidden">
-					<div class="prose dark:prose-invert max-w-none custom-md" id="preview-body"></div>
+					<label class="admin-field">
+						<span class="admin-label">描述（摘要，用于列表与 SEO）</span>
+						<textarea
+							class="admin-textarea"
+							name="description"
+							rows="2"
+							style="min-height: 4rem; font-family: inherit;">{v.description}</textarea>
+					</label>
 				</div>
-			</div>
+			</section>
+
+			<section class="admin-section-card">
+				<div class="admin-section-card-header">
+					<label class="admin-section-card-title" for="body-input">正文（Markdown）</label>
+				</div>
+				<div class="admin-section-card-body">
+					<div class="admin-editor-toolbar">
+						<span class="admin-editor-mode">markdown · 实时预览</span>
+						<button
+							type="button"
+							id="toggle-preview"
+							class="admin-btn"
+							aria-controls="preview-pane"
+							aria-expanded="false"
+						>
+							切换预览
+						</button>
+					</div>
+					<textarea
+						id="body-input"
+						class="admin-textarea"
+						name="body_md"
+						rows="24"
+						aria-describedby="body-help"
+						placeholder="在这里写 Markdown 正文…">{v.body_md}</textarea>
+					<p id="body-help" class="admin-help" style="margin-top: 0.5rem;">
+						支持标准 Markdown 语法；预览使用与站点一致的渲染管线。
+					</p>
+
+					<div id="preview-pane" class="hidden">
+						<div class="prose dark:prose-invert max-w-none custom-md" id="preview-body"></div>
+					</div>
+				</div>
+			</section>
 		</div>
 
 		<!-- 右栏：元信息 -->
-		<div class="flex flex-col gap-4">
-			<div class="card-base p-5">
-				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">发布</h2>
+		<div class="admin-editor-sidebar">
+			<section class="admin-section-card admin-sticky-card">
+				<div class="admin-section-card-header">
+					<h2 class="admin-section-card-title">发布</h2>
+					<span class="admin-editor-mode">{isEdit ? "编辑已有文章" : "新建文章"}</span>
+				</div>
+				<div class="admin-section-card-body">
+					<div class="admin-status-track">
+						<span class="admin-status-dot" id="status-dot" data-published={v.draft ? "false" : "true"}></span>
+						<span>当前状态：<strong id="status-label">{v.draft ? "草稿" : "已发布"}</strong></span>
+					</div>
 
-				<label class="admin-field mb-4">
-					<span class="admin-label">slug（URL 路径，唯一）</span>
-					<input class="admin-input" name="slug" value={v.slug} required />
-				</label>
-
-				<label class="admin-field mb-4">
-					<span class="admin-label">发布日期</span>
-					<input class="admin-input" type="date" name="published_at" value={v.published_at} />
-				</label>
-
-				<div class="mb-4 flex flex-col gap-2">
-					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
-						<input type="checkbox" name="draft" checked={v.draft} />
-						<span>草稿（不在站点显示）</span>
+					<label class="admin-field mb-4">
+						<span class="admin-label">slug（URL 路径，唯一）</span>
+						<input class="admin-input" name="slug" value={v.slug} required />
 					</label>
-					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
-						<input type="checkbox" name="pinned" checked={v.pinned} />
-						<span>置顶</span>
+
+					<label class="admin-field mb-4">
+						<span class="admin-label">发布日期</span>
+						<input class="admin-input" type="date" name="published_at" value={v.published_at} />
 					</label>
-					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
-						<input type="checkbox" name="comment" checked={v.comment} />
-						<span>允许评论</span>
+
+					<div class="admin-checkbox-list mb-4">
+						<label class="admin-checkbox">
+							<input type="checkbox" name="draft" id="draft-toggle" checked={v.draft} />
+							<span>草稿（不在站点显示）</span>
+						</label>
+						<label class="admin-checkbox">
+							<input type="checkbox" name="pinned" checked={v.pinned} />
+							<span>置顶</span>
+						</label>
+						<label class="admin-checkbox">
+							<input type="checkbox" name="comment" checked={v.comment} />
+							<span>允许评论</span>
+						</label>
+					</div>
+
+					<div class="flex flex-col gap-2">
+						<button type="submit" class="admin-btn admin-btn-primary" id="save-btn">
+							{isEdit ? "保存修改" : "创建文章"}
+						</button>
+						{isEdit && (
+							<a
+								href={`/posts/${v.slug}/`}
+								target="_blank"
+								rel="noopener"
+								class="admin-btn"
+							>
+								查看文章
+							</a>
+						)}
+					</div>
+				</div>
+			</section>
+
+			<section class="admin-section-card">
+				<div class="admin-section-card-header">
+					<h2 class="admin-section-card-title">分类与标签</h2>
+				</div>
+				<div class="admin-section-card-body">
+					<label class="admin-field mb-4">
+						<span class="admin-label">分类</span>
+						<input class="admin-input" name="category" value={v.category} />
+					</label>
+
+					<label class="admin-field mb-4">
+						<span class="admin-label">标签（逗号分隔）</span>
+						<input class="admin-input" name="tags" value={v.tags} />
+					</label>
+
+					<label class="admin-field">
+						<span class="admin-label">系列</span>
+						<input class="admin-input" name="series" value={v.series} />
 					</label>
 				</div>
+			</section>
 
-				<div class="flex flex-col gap-2">
-					<button type="submit" class="admin-btn admin-btn-primary" id="save-btn">
-						{isEdit ? "保存修改" : "创建文章"}
-					</button>
-					{isEdit && (
-						<a
-							href={`/posts/${v.slug}/`}
-							target="_blank"
-							rel="noopener"
-							class="admin-btn"
-						>
-							查看文章
-						</a>
-					)}
+			<section class="admin-section-card">
+				<div class="admin-section-card-header">
+					<h2 class="admin-section-card-title">封面与语言</h2>
 				</div>
-			</div>
+				<div class="admin-section-card-body">
+					<label class="admin-field mb-4">
+						<span class="admin-label">封面图路径</span>
+						<input class="admin-input" name="image" value={v.image} placeholder="./images/cover.avif" />
+					</label>
 
-			<div class="card-base p-5">
-				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">分类与标签</h2>
+					<label class="admin-field">
+						<span class="admin-label">语言</span>
+						<input class="admin-input" name="lang" value={v.lang} placeholder="zh-CN" />
+					</label>
+				</div>
+			</section>
 
-				<label class="admin-field mb-4">
-					<span class="admin-label">分类</span>
-					<input class="admin-input" name="category" value={v.category} />
-				</label>
-
-				<label class="admin-field mb-4">
-					<span class="admin-label">标签（逗号分隔）</span>
-					<input class="admin-input" name="tags" value={v.tags} />
-				</label>
-
-				<label class="admin-field">
-					<span class="admin-label">系列</span>
-					<input class="admin-input" name="series" value={v.series} />
-				</label>
-			</div>
-
-			<div class="card-base p-5">
-				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">封面与语言</h2>
-
-				<label class="admin-field mb-4">
-					<span class="admin-label">封面图路径</span>
-					<input class="admin-input" name="image" value={v.image} placeholder="./images/cover.avif" />
-				</label>
-
-				<label class="admin-field">
-					<span class="admin-label">语言</span>
-					<input class="admin-input" name="lang" value={v.lang} placeholder="zh-CN" />
-				</label>
-			</div>
-
-			<details class="card-base p-5">
-				<summary class="cursor-pointer text-sm font-semibold text-(--deep-text)">
-					高级选项
-				</summary>
-				<div class="mt-4 flex flex-col gap-4">
+			<details class="admin-section-card admin-details">
+				<summary class="admin-details-summary">高级选项</summary>
+				<div class="admin-section-card-body flex flex-col gap-4">
 					<label class="admin-field">
 						<span class="admin-label">作者</span>
 						<input class="admin-input" name="author" value={v.author} />
@@ -198,7 +228,13 @@ const v = {
 					</label>
 					<label class="admin-field">
 						<span class="admin-label">访问密码（留空则公开）</span>
-						<input class="admin-input" name="password" value={v.password} />
+						<input
+							class="admin-input"
+							type="password"
+							name="password"
+							value={v.password}
+							autocomplete="new-password"
+						/>
 					</label>
 					<label class="admin-field">
 						<span class="admin-label">密码提示</span>
@@ -219,6 +255,9 @@ const v = {
 	const previewPane = document.getElementById("preview-pane");
 	const previewBody = document.getElementById("preview-body");
 	const toggleBtn = document.getElementById("toggle-preview");
+	const draftToggle = document.getElementById("draft-toggle") as HTMLInputElement | null;
+	const statusDot = document.getElementById("status-dot");
+	const statusLabel = document.getElementById("status-label");
 
 	function show(el: HTMLElement | null, msg: string) {
 		if (!el) return;
@@ -255,12 +294,21 @@ const v = {
 			previewPane.classList.add("hidden");
 			bodyInput.classList.remove("hidden");
 			toggleBtn.textContent = "切换预览";
+			toggleBtn.setAttribute("aria-expanded", "false");
 		} else {
 			previewPane.classList.remove("hidden");
 			bodyInput.classList.add("hidden");
 			toggleBtn.textContent = "返回编辑";
+			toggleBtn.setAttribute("aria-expanded", "true");
 			void renderPreview();
 		}
+	});
+
+	// 状态条跟随「草稿」勾选，保存前就能看出将发布成什么状态
+	draftToggle?.addEventListener("change", () => {
+		const draft = draftToggle.checked;
+		statusDot?.setAttribute("data-published", draft ? "false" : "true");
+		if (statusLabel) statusLabel.textContent = draft ? "草稿" : "已发布";
 	});
 
 	bodyInput?.addEventListener("input", () => {

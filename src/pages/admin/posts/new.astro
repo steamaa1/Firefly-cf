@@ -11,6 +11,15 @@ if (!user) return Astro.redirect("/admin/login/");
 ---
 
 <AdminLayout title="写文章" active="new" username={user.username}>
-	<h1 class="mb-5 text-xl font-bold text-(--deep-text)">写文章</h1>
+	<div class="admin-page-header">
+		<div>
+			<div class="admin-page-kicker">Content desk / new</div>
+			<h1 class="admin-page-title">写文章</h1>
+			<p class="admin-page-description">填写正文与元信息后创建；草稿不会出现在站点上。</p>
+		</div>
+		<div class="admin-page-actions">
+			<a href="/admin/" class="admin-backlink">← 返回列表</a>
+		</div>
+	</div>
 	<PostEditor post={null} />
 </AdminLayout>

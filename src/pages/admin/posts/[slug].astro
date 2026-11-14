@@ -23,11 +23,15 @@ if (!post) return Astro.rewrite("/404/");
 ---
 
 <AdminLayout title={`编辑 · ${post.title}`} active="posts" username={user.username}>
-	<div class="mb-5 flex items-center gap-3">
-		<a href="/admin/" class="text-sm text-black/55 hover:text-(--primary) dark:text-white/55">
-			← 返回列表
-		</a>
-		<h1 class="text-xl font-bold text-(--deep-text)">编辑文章</h1>
+	<div class="admin-page-header">
+		<div>
+			<div class="admin-page-kicker">Content desk / edit</div>
+			<h1 class="admin-page-title">编辑文章</h1>
+			<p class="admin-page-description">/{post.slug}/ · {post.draft === 1 ? "草稿" : "已发布"}</p>
+		</div>
+		<div class="admin-page-actions">
+			<a href="/admin/" class="admin-backlink">← 返回列表</a>
+		</div>
 	</div>
 	<PostEditor post={post} />
 </AdminLayout>
