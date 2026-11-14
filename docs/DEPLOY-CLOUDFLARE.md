@@ -4,13 +4,21 @@ Firefly 是**全站预渲染的纯静态站点**：`astro build` 直接把站点
 Cloudflare Workers 只负责托管这些静态文件。因此**不需要** `@astrojs/cloudflare` adapter，
 也不需要配置 Worker 入口（`main`）。
 
-## 为什么不用 adapter
+## 架构说明：为什么需要 adapter
 
-启用 `@astrojs/cloudflare` 会把产物拆成 `dist/client`（静态资源）+ `dist/server`（SSR 入口）。
-由于本站全部页面都在构建期预渲染，`dist/server` 是空的，却让 `assets.directory`
-指向了不含 `index.html` 的目录，部署后会出现整站 404。
-纯静态站的官方推荐做法就是不引入 adapter（见
-[Cloudflare Astro 指南](https://developers.cloudflare.com/workers/framework-guides/web-apps/astro/)）。
+当前版本引入后台管理，内容存 D1，公开站通过 Live Collections 在**请求时**读取，
+因此需要 `@astrojs/cloudflare` adapter 与 `output: "server"`。
+
+启用 adapter 后产物分为两部分，`wrangler.jsonc` 必须对应配置：
+
+| 产物 | 用途 | 配置项 |
+| --- | --- | --- |
+| `dist/client` | 静态资源（CSS/图片/字体） | `assets.directory` |
+| `dist/server` | Worker 入口（SSR 与 API） | `main` |
+
+> 历史提示：纯静态版本不需要 adapter，产物直接在 `dist/`。
+> 若你从旧版本升级而来，注意 `assets.directory` 要从 `./dist` 改为 `./dist/client`，
+> 否则会出现整站 404。
 
 ## 方式一：连接 Git 仓库自动部署（推荐）
 
@@ -108,11 +116,37 @@ npx wrangler deploy
 修改文章后需重新执行 `npx tsx scripts/d1-import.ts` 生成新 SQL 并 apply，
 或在后台保存时由服务端渲染（后台功能落地后启用）。
 
-## 已知限制
+## 后台管理
 
-- **Worker 体积约 8.9 MB**（已优化：图标白名单 + 移除运行时 markdown 渲染，原为 39.9 MB）。
-- **新增图标需重新生成白名单**：在源码或配置中用到新图标后，执行 `pnpm icons`，
-  否则 SSR 页面里该图标会缺失。图标集中在 `src/constants/icon-include.json`。
-- **免费版 CPU 限制 10 ms**：SSR 渲染较重，若频繁触发 1102 错误需升级 Workers Paid。
-- **MDX 不支持**：Live Collections 无法运行 MDX，`mdx-example.mdx` 与 `friends.mdx` 导入时按纯文本处理。
-- **Pagefind 已移除**：构建期无 HTML 可索引，搜索改由 D1 提供。
+访问 `/admin/` 进入后台，当前支持文章的列表 / 新建 / 编辑 / 删除。
+
+### 首次初始化
+
+1. 配置初始化令牌：
+   ```bash
+   npx wrangler secret put ADMIN_SETUP_TOKEN
+   ```
+2. 打开 `/admin/login/`，表单会多出「初始化令牌」一栏。
+3. 填入用户名、密码与该令牌，即创建第一个管理员。
+
+之后令牌不再参与登录（`users` 表非空时该字段自动隐藏），
+避免出现 hardcode 默认密码的常见漏洞。
+
+### 与前台保持一致的实现方式
+
+后台不引入独立 UI 体系，直接复用主站资源：
+
+| 复用项 | 位置 |
+| --- | --- |
+| HTML 外壳（主题/字体/CSS 变量注入） | `src/layouts/Layout.astro` |
+| 卡片与按钮类 | `card-base`、`btn-regular`（`src/styles/main.css`） |
+| 主题色与圆角变量 | `--primary`、`--radius-large`、`--card-bg`（`src/styles/variables.styl`） |
+| Markdown 预览样式 | `src/styles/markdown.css` |
+
+后台自有样式集中在 `src/styles/admin.css`，仅组合上述变量，不另设配色。
+
+### 技术要点
+
+- **鉴权**：PBKDF2-SHA256（Web Crypto，无原生依赖）+ Astro sessions（SESSION KV 由适配器自动供应）。
+- **保存即渲染**：保存文章时把 `body_md` 渲染成 `body_html` 入库，公开站只读 HTML。
+- **预览**：`/api/admin/preview` 与保存共用同一个渲染函数，预览与线上效果一致。

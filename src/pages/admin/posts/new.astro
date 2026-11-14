@@ -1,0 +1,16 @@
+---
+/** 新建文章页。 */
+import AdminLayout from "@components/admin/AdminLayout.astro";
+import PostEditor from "@components/admin/PostEditor.astro";
+import { getAdminUser } from "@/lib/admin/session";
+
+export const prerender = false;
+
+const user = await getAdminUser(Astro.session);
+if (!user) return Astro.redirect("/admin/login/");
+---
+
+<AdminLayout title="写文章" active="new" username={user.username}>
+	<h1 class="mb-5 text-xl font-bold text-(--deep-text)">写文章</h1>
+	<PostEditor post={null} />
+</AdminLayout>

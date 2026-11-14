@@ -1,0 +1,33 @@
+---
+/** 编辑已有文章。路由参数与 /admin/posts/new/ 的 new 不冲突：
+ *  Astro 会优先匹配静态路由 new.astro。 */
+import AdminLayout from "@components/admin/AdminLayout.astro";
+import PostEditor from "@components/admin/PostEditor.astro";
+import { getAdminUser } from "@/lib/admin/session";
+import { getPostBySlug } from "@/lib/admin/posts";
+
+export const prerender = false;
+
+const user = await getAdminUser(Astro.session);
+if (!user) return Astro.redirect("/admin/login/");
+
+const slug = Astro.params.slug ?? "";
+let post = null;
+try {
+	post = await getPostBySlug(slug);
+} catch {
+	post = null;
+}
+
+if (!post) return Astro.rewrite("/404/");
+---
+
+<AdminLayout title={`编辑 · ${post.title}`} active="posts" username={user.username}>
+	<div class="mb-5 flex items-center gap-3">
+		<a href="/admin/" class="text-sm text-black/55 hover:text-(--primary) dark:text-white/55">
+			← 返回列表
+		</a>
+		<h1 class="text-xl font-bold text-(--deep-text)">编辑文章</h1>
+	</div>
+	<PostEditor post={post} />
+</AdminLayout>

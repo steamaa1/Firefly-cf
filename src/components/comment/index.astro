@@ -1,5 +1,4 @@
 ---
-import type { CollectionEntry } from "astro:content";
 import { commentConfig } from "@/config/commentConfig";
 import Key from "@/i18n/i18nKey";
 import { i18n } from "@/i18n/translation";
@@ -10,8 +9,18 @@ import Giscus from "./Giscus.astro";
 import Twikoo from "./Twikoo.astro";
 import Waline from "./Waline.astro";
 
+/**
+ * 只依赖 id / collection / data.title，因此不绑定具体的 CollectionEntry 类型：
+ * 内容已改由 Live Collections 提供，两者的类型来自不同模块但结构兼容。
+ */
+interface CommentPost {
+	id: string;
+	collection?: string;
+	data?: { title?: string };
+}
+
 interface Props {
-	post?: CollectionEntry<"posts"> | CollectionEntry<"spec">;
+	post?: CommentPost;
 	customPath?: string;
 	title?: string;
 }
@@ -29,7 +38,7 @@ const path = customPath
 			: `/${slug}`
 		: `/${slug}`;
 const url = `${Astro.site?.href}${path}`;
-const postTitle = post && "title" in post.data ? post.data.title : undefined;
+const postTitle = post?.data?.title;
 
 // 强制commentService类型为string，避免类型不兼容警告
 let commentService: string = commentConfig?.type || "none";

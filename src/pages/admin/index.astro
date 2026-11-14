@@ -1,0 +1,179 @@
+---
+/**
+ * 后台文章列表。
+ *
+ * 服务端直接查 D1 渲染首屏，避免加载态闪烁；
+ * 搜索与删除通过前端调用 API 完成。
+ */
+import AdminLayout from "@components/admin/AdminLayout.astro";
+import { getAdminUser } from "@/lib/admin/session";
+import { listPosts } from "@/lib/admin/posts";
+
+export const prerender = false;
+
+const user = await getAdminUser(Astro.session);
+if (!user) return Astro.redirect("/admin/login/");
+
+let posts: Awaited<ReturnType<typeof listPosts>> = [];
+let loadError = "";
+try {
+	posts = await listPosts();
+} catch (e) {
+	loadError = e instanceof Error ? e.message : String(e);
+}
+
+const total = posts.length;
+const drafts = posts.filter((p) => p.draft === 1).length;
+
+function fmtDate(v: string): string {
+	try {
+		return new Date(v).toLocaleDateString("zh-CN", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+		});
+	} catch {
+		return v;
+	}
+}
+---
+
+<AdminLayout title="文章" active="posts" username={user.username}>
+	<div class="mb-5 flex flex-wrap items-center gap-3">
+		<h1 class="text-xl font-bold text-(--deep-text)">文章</h1>
+		<span class="text-sm text-black/55 dark:text-white/55">
+			共 {total} 篇 · 草稿 {drafts} 篇
+		</span>
+		<div class="ml-auto flex items-center gap-2">
+			<input
+				id="search-input"
+				class="admin-input"
+				style="width: 14rem;"
+				type="search"
+				placeholder="搜索标题或 slug"
+			/>
+			<a href="/admin/posts/new/" class="admin-btn admin-btn-primary">写文章</a>
+		</div>
+	</div>
+
+	{loadError && <div class="admin-alert admin-alert-error mb-4">读取失败：{loadError}</div>}
+
+	<div class="card-base overflow-hidden">
+		{posts.length === 0 ? (
+			<div class="px-6 py-16 text-center text-sm text-black/50 dark:text-white/50">
+				还没有文章。点击右上角「写文章」开始。
+			</div>
+		) : (
+			<table class="admin-table">
+				<thead>
+					<tr>
+						<th>标题</th>
+						<th style="width: 8rem;">分类</th>
+						<th style="width: 7rem;">状态</th>
+						<th style="width: 7rem;">日期</th>
+						<th style="width: 9rem;"></th>
+					</tr>
+				</thead>
+				<tbody id="post-tbody">
+					{posts.map((p) => (
+						<tr data-slug={p.slug} data-title={p.title.toLowerCase()}>
+							<td>
+								<div class="flex items-center gap-2">
+									{p.pinned === 1 && (
+										<span class="admin-badge admin-badge-pinned">置顶</span>
+									)}
+									<a
+										href={`/admin/posts/${p.slug}/`}
+										class="font-medium hover:text-(--primary)"
+									>
+										{p.title}
+									</a>
+								</div>
+								<div class="mt-0.5 text-xs text-black/40 dark:text-white/40">
+									/{p.slug}/
+								</div>
+							</td>
+							<td class="text-sm text-black/65 dark:text-white/65">
+								{p.category || "—"}
+							</td>
+							<td>
+								{p.draft === 1 ? (
+									<span class="admin-badge admin-badge-draft">草稿</span>
+								) : (
+									<span class="admin-badge admin-badge-live">已发布</span>
+								)}
+							</td>
+							<td class="text-sm text-black/55 dark:text-white/55">
+								{fmtDate(p.published_at)}
+							</td>
+							<td>
+								<div class="flex items-center gap-1.5">
+									<a
+										href={`/admin/posts/${p.slug}/`}
+										class="admin-btn"
+										style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
+									>
+										编辑
+									</a>
+									<button
+										type="button"
+										class="admin-btn admin-btn-danger js-delete"
+										data-slug={p.slug}
+										data-title={p.title}
+										style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
+									>
+										删除
+									</button>
+								</div>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		)}
+	</div>
+</AdminLayout>
+
+<script>
+	// 前端筛选：数据量小，直接在本地过滤，避免额外请求
+	const input = document.getElementById("search-input") as HTMLInputElement | null;
+	const tbody = document.getElementById("post-tbody");
+
+	input?.addEventListener("input", () => {
+		const q = input.value.trim().toLowerCase();
+		tbody?.querySelectorAll("tr").forEach((tr) => {
+			const row = tr as HTMLElement;
+			const title = row.dataset.title ?? "";
+			const slug = (row.dataset.slug ?? "").toLowerCase();
+			const hit = !q || title.includes(q) || slug.includes(q);
+			row.style.display = hit ? "" : "none";
+		});
+	});
+
+	// 删除：二次确认后调用 API
+	document.querySelectorAll(".js-delete").forEach((btn) => {
+		btn.addEventListener("click", async () => {
+			const el = btn as HTMLButtonElement;
+			const slug = el.dataset.slug ?? "";
+			const title = el.dataset.title ?? slug;
+			if (!confirm(`确定删除「${title}」？此操作不可撤销。`)) return;
+
+			el.disabled = true;
+			try {
+				const res = await fetch(`${import.meta.env.BASE_URL}api/admin/posts/${encodeURIComponent(slug)}`, {
+					method: "DELETE",
+				});
+				const data = (await res.json()) as { ok?: boolean; error?: string };
+				if (res.ok && data.ok) {
+					el.closest("tr")?.remove();
+					return;
+				}
+				alert(data.error ?? "删除失败");
+			} catch (err) {
+				alert(err instanceof Error ? err.message : "网络错误");
+			} finally {
+				el.disabled = false;
+			}
+		});
+	});
+</script>

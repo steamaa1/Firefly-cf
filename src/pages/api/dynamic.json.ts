@@ -20,7 +20,7 @@ export async function GET(): Promise<Response> {
 		// 仅从原始 Markdown 中提取图片信息，不参与渲染
 		(entry.body || "").replace(
 			markdownImagePattern,
-			(_match, alt: string, src: string, title?: string) => {
+			(_match: string, alt: string, src: string, title?: string) => {
 				images.push({ alt, src, ...(title ? { title } : {}) });
 				return "";
 			},

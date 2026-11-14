@@ -1,0 +1,123 @@
+---
+/**
+ * 后台登录页。
+ *
+ * 首次访问且 users 表为空时，表单会多出「初始化令牌」一栏：
+ * 令牌来自环境变量 ADMIN_SETUP_TOKEN，用于创建第一个管理员账号，
+ * 避免出现 hardcode 默认密码的风险。
+ */
+import AdminLayout from "@components/admin/AdminLayout.astro";
+import { getAdminUser, hasAnyAdmin } from "@/lib/admin/session";
+
+export const prerender = false;
+
+// 已登录则直接进入后台
+const user = await getAdminUser(Astro.session);
+if (user) return Astro.redirect("/admin/");
+
+let needsSetup = false;
+try {
+	needsSetup = !(await hasAnyAdmin());
+} catch {
+	// D1 尚未初始化时，仍展示登录表单，错误会在提交时明确提示
+	needsSetup = false;
+}
+---
+
+<AdminLayout title="登录" authed={false}>
+	<div class="admin-login-wrap" style="min-height: 70vh;">
+		<div class="admin-login-card card-base p-7">
+			<h1 class="mb-1 text-xl font-bold text-(--deep-text)">后台登录</h1>
+			<p class="mb-6 text-sm text-black/55 dark:text-white/55">
+				{needsSetup ? "首次使用：请创建管理员账号。" : "请输入管理员账号与密码。"}
+			</p>
+
+			<div id="login-error" class="admin-alert admin-alert-error mb-4 hidden"></div>
+
+			<form id="login-form" class="flex flex-col gap-4">
+				<label class="admin-field">
+					<span class="admin-label">用户名</span>
+					<input
+						class="admin-input"
+						type="text"
+						name="username"
+						autocomplete="username"
+						required
+					/>
+				</label>
+
+				<label class="admin-field">
+					<span class="admin-label">密码</span>
+					<input
+						class="admin-input"
+						type="password"
+						name="password"
+						autocomplete={needsSetup ? "new-password" : "current-password"}
+						required
+					/>
+				</label>
+
+				{
+					needsSetup && (
+						<label class="admin-field">
+							<span class="admin-label">初始化令牌（环境变量 ADMIN_SETUP_TOKEN）</span>
+							<input
+								class="admin-input"
+								type="password"
+								name="setupToken"
+								required
+							/>
+						</label>
+					)
+				}
+
+				<button type="submit" class="admin-btn admin-btn-primary mt-2" id="login-submit">
+					登录
+				</button>
+			</form>
+		</div>
+	</div>
+</AdminLayout>
+
+<script>
+	const form = document.getElementById("login-form") as HTMLFormElement | null;
+	const errBox = document.getElementById("login-error");
+	const submit = document.getElementById("login-submit") as HTMLButtonElement | null;
+
+	function showError(msg: string) {
+		if (!errBox) return;
+		errBox.textContent = msg;
+		errBox.classList.remove("hidden");
+	}
+
+	form?.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		errBox?.classList.add("hidden");
+		if (submit) submit.disabled = true;
+
+		const fd = new FormData(form);
+		const payload = {
+			username: String(fd.get("username") ?? ""),
+			password: String(fd.get("password") ?? ""),
+			setupToken: String(fd.get("setupToken") ?? ""),
+		};
+
+		try {
+			const res = await fetch(`${import.meta.env.BASE_URL}api/admin/login`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			const data = (await res.json()) as { ok?: boolean; error?: string };
+			if (res.ok && data.ok) {
+				location.href = `${import.meta.env.BASE_URL}admin/`;
+				return;
+			}
+			showError(data.error ?? "登录失败");
+		} catch (err) {
+			showError(err instanceof Error ? err.message : "网络错误");
+		} finally {
+			if (submit) submit.disabled = false;
+		}
+	});
+</script>

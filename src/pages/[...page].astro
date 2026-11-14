@@ -42,6 +42,11 @@ const page = {
 		current: currentPage === 1 ? "/" : `/${currentPage}/`,
 		prev: currentPage > 1 ? (currentPage === 2 ? "/" : `/${currentPage - 1}/`) : undefined,
 		next: start + pageSize < total ? `/${currentPage + 1}/` : undefined,
+		first: currentPage === 1 ? undefined : "/",
+		last:
+			Math.ceil(total / pageSize) > currentPage
+				? `/${Math.max(1, Math.ceil(total / pageSize))}/`
+				: undefined,
 	},
 	lastPage: Math.max(1, Math.ceil(total / pageSize)),
 };

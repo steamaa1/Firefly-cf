@@ -1,0 +1,332 @@
+---
+/**
+ * 文章编辑器（新建与编辑共用）。
+ *
+ * 表单右栏的字段顺序对齐 src/content.config.ts 的 posts schema，
+ * 便于对照；正文用纯 textarea + 实时预览，不引入第三方编辑器依赖，
+ * 保持「零新增依赖、可控」的原则。预览样式复用 Markdown.astro。
+ */
+import type { AdminPost } from "@/lib/admin/posts";
+
+interface Props {
+	/** 已有文章；新建时为 null */
+	post?: AdminPost | null;
+}
+
+const { post = null } = Astro.props;
+const isEdit = Boolean(post);
+
+const v = {
+	slug: post?.slug ?? "",
+	title: post?.title ?? "",
+	description: post?.description ?? "",
+	body_md: post?.body_md ?? "",
+	image: post?.image ?? "",
+	category: post?.category ?? "",
+	lang: post?.lang ?? "",
+	pinned: post?.pinned === 1,
+	draft: post ? post.draft === 1 : true,
+	comment: post ? post.comment === 1 : true,
+	author: post?.author ?? "",
+	source_link: post?.source_link ?? "",
+	license_name: post?.license_name ?? "",
+	license_url: post?.license_url ?? "",
+	password: post?.password ?? "",
+	password_hint: post?.password_hint ?? "",
+	series: post?.series ?? "",
+	series_order: post?.series_order ?? "",
+	tags: post?.tags ?? "",
+	published_at: post?.published_at ? post.published_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+};
+---
+
+<div id="editor-alert" class="admin-alert admin-alert-error mb-4 hidden"></div>
+<div id="editor-ok" class="admin-alert admin-alert-ok mb-4 hidden"></div>
+
+<form id="post-form" data-edit={isEdit ? "1" : "0"} data-slug={v.slug}>
+	<div class="admin-editor-grid">
+		<!-- 左栏：标题 + 正文 -->
+		<div class="flex flex-col gap-4">
+			<div class="card-base p-5">
+				<label class="admin-field mb-4">
+					<span class="admin-label">标题</span>
+					<input
+						class="admin-input"
+						style="font-size: 1.0625rem; font-weight: 600;"
+						name="title"
+						value={v.title}
+						required
+					/>
+				</label>
+
+				<label class="admin-field">
+					<span class="admin-label">描述（摘要，用于列表与 SEO）</span>
+					<textarea class="admin-textarea" name="description" rows="2" style="min-height: 4rem; font-family: inherit;">{v.description}</textarea>
+				</label>
+			</div>
+
+			<div class="card-base p-5">
+				<div class="mb-2 flex items-center gap-2">
+					<span class="admin-label" style="margin: 0;">正文（Markdown）</span>
+					<button
+						type="button"
+						id="toggle-preview"
+						class="admin-btn ml-auto"
+						style="padding: 0.25rem 0.625rem; font-size: 0.8125rem;"
+					>
+						切换预览
+					</button>
+				</div>
+				<textarea
+					id="body-input"
+					class="admin-textarea"
+					name="body_md"
+					rows="24"
+					style="min-height: 32rem;"
+					placeholder="在这里写 Markdown 正文…">{v.body_md}</textarea>
+
+				<div id="preview-pane" class="hidden">
+					<div class="prose dark:prose-invert max-w-none custom-md" id="preview-body"></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 右栏：元信息 -->
+		<div class="flex flex-col gap-4">
+			<div class="card-base p-5">
+				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">发布</h2>
+
+				<label class="admin-field mb-4">
+					<span class="admin-label">slug（URL 路径，唯一）</span>
+					<input class="admin-input" name="slug" value={v.slug} required />
+				</label>
+
+				<label class="admin-field mb-4">
+					<span class="admin-label">发布日期</span>
+					<input class="admin-input" type="date" name="published_at" value={v.published_at} />
+				</label>
+
+				<div class="mb-4 flex flex-col gap-2">
+					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
+						<input type="checkbox" name="draft" checked={v.draft} />
+						<span>草稿（不在站点显示）</span>
+					</label>
+					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
+						<input type="checkbox" name="pinned" checked={v.pinned} />
+						<span>置顶</span>
+					</label>
+					<label class="flex items-center gap-2 text-sm text-(--deep-text)">
+						<input type="checkbox" name="comment" checked={v.comment} />
+						<span>允许评论</span>
+					</label>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<button type="submit" class="admin-btn admin-btn-primary" id="save-btn">
+						{isEdit ? "保存修改" : "创建文章"}
+					</button>
+					{isEdit && (
+						<a
+							href={`/posts/${v.slug}/`}
+							target="_blank"
+							rel="noopener"
+							class="admin-btn"
+						>
+							查看文章
+						</a>
+					)}
+				</div>
+			</div>
+
+			<div class="card-base p-5">
+				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">分类与标签</h2>
+
+				<label class="admin-field mb-4">
+					<span class="admin-label">分类</span>
+					<input class="admin-input" name="category" value={v.category} />
+				</label>
+
+				<label class="admin-field mb-4">
+					<span class="admin-label">标签（逗号分隔）</span>
+					<input class="admin-input" name="tags" value={v.tags} />
+				</label>
+
+				<label class="admin-field">
+					<span class="admin-label">系列</span>
+					<input class="admin-input" name="series" value={v.series} />
+				</label>
+			</div>
+
+			<div class="card-base p-5">
+				<h2 class="mb-3 text-sm font-semibold text-(--deep-text)">封面与语言</h2>
+
+				<label class="admin-field mb-4">
+					<span class="admin-label">封面图路径</span>
+					<input class="admin-input" name="image" value={v.image} placeholder="./images/cover.avif" />
+				</label>
+
+				<label class="admin-field">
+					<span class="admin-label">语言</span>
+					<input class="admin-input" name="lang" value={v.lang} placeholder="zh-CN" />
+				</label>
+			</div>
+
+			<details class="card-base p-5">
+				<summary class="cursor-pointer text-sm font-semibold text-(--deep-text)">
+					高级选项
+				</summary>
+				<div class="mt-4 flex flex-col gap-4">
+					<label class="admin-field">
+						<span class="admin-label">作者</span>
+						<input class="admin-input" name="author" value={v.author} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">原文链接</span>
+						<input class="admin-input" name="source_link" value={v.source_link} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">许可名称</span>
+						<input class="admin-input" name="license_name" value={v.license_name} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">许可链接</span>
+						<input class="admin-input" name="license_url" value={v.license_url} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">系列序号</span>
+						<input class="admin-input" type="number" name="series_order" value={v.series_order} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">访问密码（留空则公开）</span>
+						<input class="admin-input" name="password" value={v.password} />
+					</label>
+					<label class="admin-field">
+						<span class="admin-label">密码提示</span>
+						<input class="admin-input" name="password_hint" value={v.password_hint} />
+					</label>
+				</div>
+			</details>
+		</div>
+	</div>
+</form>
+
+<script>
+	const form = document.getElementById("post-form") as HTMLFormElement | null;
+	const alertBox = document.getElementById("editor-alert");
+	const okBox = document.getElementById("editor-ok");
+	const saveBtn = document.getElementById("save-btn") as HTMLButtonElement | null;
+	const bodyInput = document.getElementById("body-input") as HTMLTextAreaElement | null;
+	const previewPane = document.getElementById("preview-pane");
+	const previewBody = document.getElementById("preview-body");
+	const toggleBtn = document.getElementById("toggle-preview");
+
+	function show(el: HTMLElement | null, msg: string) {
+		if (!el) return;
+		el.textContent = msg;
+		el.classList.remove("hidden");
+	}
+	function hide(el: HTMLElement | null) {
+		el?.classList.add("hidden");
+	}
+
+	// 预览：调用后台接口渲染，保证与站点最终效果一致
+	let previewTimer: number | undefined;
+	async function renderPreview() {
+		if (!bodyInput || !previewBody) return;
+		try {
+			const res = await fetch(`${import.meta.env.BASE_URL}api/admin/preview`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ body_md: bodyInput.value }),
+			});
+			const data = (await res.json()) as { ok?: boolean; html?: string };
+			if (data.ok && data.html !== undefined) {
+				previewBody.innerHTML = data.html;
+			}
+		} catch {
+			previewBody.textContent = "预览渲染失败";
+		}
+	}
+
+	toggleBtn?.addEventListener("click", () => {
+		if (!bodyInput || !previewPane) return;
+		const showing = !previewPane.classList.contains("hidden");
+		if (showing) {
+			previewPane.classList.add("hidden");
+			bodyInput.classList.remove("hidden");
+			toggleBtn.textContent = "切换预览";
+		} else {
+			previewPane.classList.remove("hidden");
+			bodyInput.classList.add("hidden");
+			toggleBtn.textContent = "返回编辑";
+			void renderPreview();
+		}
+	});
+
+	bodyInput?.addEventListener("input", () => {
+		if (previewPane?.classList.contains("hidden")) return;
+		clearTimeout(previewTimer);
+		previewTimer = window.setTimeout(() => void renderPreview(), 400);
+	});
+
+	form?.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		hide(alertBox);
+		hide(okBox);
+		if (saveBtn) saveBtn.disabled = true;
+
+		const fd = new FormData(form);
+		const isEdit = form.dataset.edit === "1";
+		const originalSlug = form.dataset.slug ?? "";
+
+		const payload = {
+			slug: String(fd.get("slug") ?? "").trim(),
+			title: String(fd.get("title") ?? "").trim(),
+			description: String(fd.get("description") ?? ""),
+			body_md: String(fd.get("body_md") ?? ""),
+			image: String(fd.get("image") ?? ""),
+			category: String(fd.get("category") ?? ""),
+			lang: String(fd.get("lang") ?? ""),
+			pinned: fd.get("pinned") === "on",
+			draft: fd.get("draft") === "on",
+			comment: fd.get("comment") === "on",
+			author: String(fd.get("author") ?? ""),
+			source_link: String(fd.get("source_link") ?? ""),
+			license_name: String(fd.get("license_name") ?? ""),
+			license_url: String(fd.get("license_url") ?? ""),
+			password: String(fd.get("password") ?? ""),
+			password_hint: String(fd.get("password_hint") ?? ""),
+			series: String(fd.get("series") ?? ""),
+			series_order: String(fd.get("series_order") ?? ""),
+			published_at: String(fd.get("published_at") ?? ""),
+			tags: String(fd.get("tags") ?? ""),
+		};
+
+		const endpoint = isEdit
+			? `${import.meta.env.BASE_URL}api/admin/posts/${encodeURIComponent(originalSlug)}`
+			: `${import.meta.env.BASE_URL}api/admin/posts`;
+
+		try {
+			const res = await fetch(endpoint, {
+				method: isEdit ? "PUT" : "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			const data = (await res.json()) as { ok?: boolean; error?: string; slug?: string };
+
+			if (res.ok && data.ok) {
+				if (isEdit) {
+					show(okBox, "已保存");
+				} else {
+					location.href = `${import.meta.env.BASE_URL}admin/posts/${encodeURIComponent(data.slug ?? payload.slug)}/`;
+				}
+				return;
+			}
+			show(alertBox, data.error ?? "保存失败");
+		} catch (err) {
+			show(alertBox, err instanceof Error ? err.message : "网络错误");
+		} finally {
+			if (saveBtn) saveBtn.disabled = false;
+		}
+	});
+</script>

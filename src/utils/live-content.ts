@@ -18,6 +18,11 @@ export type LiveEntryLike<T, C extends string = string> = {
 	collection: C;
 	/** 原始 Markdown 原文（部分 loader 提供，供搜索文本/图片提取使用） */
 	body?: string;
+	/**
+	 * 原文件路径。D1 内容没有真实文件，这里始终为 undefined；
+	 * 保留该字段是为了让调用方（图片路径解析等）的类型与原 CollectionEntry 兼容。
+	 */
+	filePath?: string;
 	rendered?: { html: string };
 };
 
