@@ -1,6 +1,8 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "firefly",
+	// Worker 名称需与 Cloudflare 上 Workers Builds 里配置的一致，
+	// 否则部署时 CI 会强制覆盖成本项并尝试提 PR 修正。改名前先确认控制台里的名字。
+	"name": "firefly-cf",
 	"compatibility_date": "2025-10-01",
 	"compatibility_flags": ["nodejs_compat"],
 	// 后台与公开站同一 Worker：/admin 与 D1 驱动的内容走 Worker，
