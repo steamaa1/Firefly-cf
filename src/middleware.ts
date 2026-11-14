@@ -1,12 +1,7 @@
 /**
- * Astro 中间件：确保 D1 表结构就绪。
- *
- * 移植自 moments-cf「应用启动时 AutoMigrate」的做法：
- * 部署后无需手动执行迁移，第一次访问任一页面时自动建表。
- *
- * 注意：
- * - 只在检测到 posts 表不存在时才执行建表语句，已建好时只多一次轻量查询。
- * - 建表失败不阻断请求，交由页面自身报错，避免整站 500 且错误信息被掩盖。
+ * Astro 中间件：
+ * 1. 确保 D1 表结构就绪（移植自 moments-cf 的启动时 AutoMigrate）
+ * 2. 捕获渲染异常并把真实错误输出到响应，避免只看到 “[object Object]”
  */
 import { defineMiddleware } from "astro:middleware";
 import { ensureSchema } from "@/lib/auto-migrate";
@@ -14,6 +9,7 @@ import { ensureSchema } from "@/lib/auto-migrate";
 let warned = false;
 
 export const onRequest = defineMiddleware(async (context, next) => {
+	// --- 1. 自动建表 ---
 	try {
 		const { env } = await import("cloudflare:workers");
 		const db = env?.DB;
@@ -21,11 +17,38 @@ export const onRequest = defineMiddleware(async (context, next) => {
 			await ensureSchema(db as Parameters<typeof ensureSchema>[0]);
 		}
 	} catch (e) {
-		// 只警告一次，避免日志刷屏；真正的数据库错误会在页面查询时暴露
 		if (!warned) {
 			warned = true;
 			console.warn(`[middleware] 自动建表失败：${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
-	return next();
+
+	// --- 2. 捕获渲染错误并显式输出 ---
+	try {
+		return await next();
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e);
+		const stack = e instanceof Error ? e.stack : "";
+		console.error("[middleware] 页面渲染失败:", msg, stack);
+
+		// 仅在浏览器直接访问页面时回显错误文本，便于定位；
+		// 结构化的 HTML 错误页由 src/pages/500.astro 负责。
+		const wantsHtml = (context.request.headers.get("accept") ?? "").includes("text/html");
+		if (wantsHtml) {
+			return new Response(
+				`<!doctype html><meta charset="utf-8"><title>500</title>` +
+					`<pre style="font:14px ui-monospace,monospace;white-space:pre-wrap;padding:2rem;background:#1a1a1a;color:#e5e5e5;margin:0;min-height:100vh">` +
+					`服务端渲染失败\n\n${escapeHtml(msg)}\n\n${escapeHtml(stack ?? "")}</pre>`,
+				{ status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } },
+			);
+		}
+		return new Response(JSON.stringify({ ok: false, error: msg }), {
+			status: 500,
+			headers: { "Content-Type": "application/json; charset=utf-8" },
+		});
+	}
 });
+
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

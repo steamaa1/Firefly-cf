@@ -1,0 +1,58 @@
+---
+/**
+ * 全局错误页。
+ *
+ * 默认情况下 Astro 在 SSR 出错时可能把异常对象直接输出，表现为页面上只有
+ * “[object Object]”，完全看不出原因。这里显式打印错误并把信息回显，
+ * 便于在 Cloudflare 的 Logs 与浏览器中直接定位。
+ */
+// Astro 在 SSR 出错时会通过 props 传入 error 对象（类型定义未覆盖，故做结构化断言）
+const props = Astro.props as { error?: unknown };
+const err = props?.error;
+const message = err instanceof Error ? err.message : String(err ?? "未知错误");
+const stack = err instanceof Error ? err.stack : undefined;
+console.error("[500]", message, stack);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>500 · 服务端错误</title>
+		<style>
+			body {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				background: #1a1a1a;
+				color: #e5e5e5;
+				margin: 0;
+				padding: 2rem;
+				line-height: 1.6;
+			}
+			h1 { color: #f87171; font-size: 1.25rem; }
+			pre {
+				background: #262626;
+				padding: 1rem;
+				border-radius: 0.5rem;
+				overflow: auto;
+				white-space: pre-wrap;
+				word-break: break-word;
+			}
+			.hint { color: #a3a3a3; font-size: 0.875rem; }
+		</style>
+	</head>
+	<body>
+		<h1>500 · 服务端渲染失败</h1>
+		<p class="hint">错误信息：</p>
+		<pre>{message}</pre>
+		{stack && (
+			<>
+				<p class="hint">堆栈：</p>
+				<pre>{stack}</pre>
+			</>
+		)}
+		<p class="hint">
+			完整日志请查看 Cloudflare 控制台 → Workers &amp; Pages → firefly-cf → Logs。
+		</p>
+	</body>
+</html>
