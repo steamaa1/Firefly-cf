@@ -8,6 +8,7 @@
  */
 import AdminLayout from "@components/admin/AdminLayout.astro";
 import { getAdminUser, hasAnyAdmin } from "@/lib/admin/session";
+import { readEnv } from "@/lib/admin/env-util";
 
 export const prerender = false;
 
@@ -16,8 +17,14 @@ const user = await getAdminUser(Astro.session);
 if (user) return Astro.redirect("/admin/");
 
 let needsSetup = false;
+let hasSetupToken = false;
 try {
 	needsSetup = !(await hasAnyAdmin());
+	// 只有服务端确实配置了令牌，才要求填写；否则首次登录直接创建管理员。
+	if (needsSetup) {
+		const { value } = await readEnv("ADMIN_SETUP_TOKEN");
+		hasSetupToken = Boolean(value);
+	}
 } catch {
 	// D1 尚未初始化时，仍展示登录表单，错误会在提交时明确提示
 	needsSetup = false;
@@ -29,7 +36,11 @@ try {
 		<div class="admin-login-card card-base p-7">
 			<h1 class="mb-1 text-xl font-bold text-(--deep-text)">后台登录</h1>
 			<p class="mb-6 text-sm text-black/55 dark:text-white/55">
-				{needsSetup ? "首次使用：请创建管理员账号。" : "请输入管理员账号与密码。"}
+				{needsSetup
+					? hasSetupToken
+						? "首次使用：请创建管理员账号，并填写初始化令牌。"
+						: "首次使用：输入用户名与密码即可创建管理员账号。"
+					: "请输入管理员账号与密码。"}
 			</p>
 
 			<div id="login-error" class="admin-alert admin-alert-error mb-4 hidden"></div>
@@ -58,7 +69,7 @@ try {
 				</label>
 
 				{
-					needsSetup && (
+					needsSetup && hasSetupToken && (
 						<label class="admin-field">
 							<span class="admin-label">初始化令牌（环境变量 ADMIN_SETUP_TOKEN）</span>
 							<input

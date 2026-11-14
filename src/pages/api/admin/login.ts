@@ -8,7 +8,7 @@ import type { APIRoute } from "astro";
 import { getDb } from "@/loaders/d1-core";
 import { hashPassword, verifyPassword } from "@/lib/admin/password";
 import { setAdminUser } from "@/lib/admin/session";
-import { env } from "cloudflare:workers";
+import { readEnv } from "@/lib/admin/env-util";
 
 export const prerender = false;
 
@@ -38,15 +38,20 @@ export const POST: APIRoute = async ({ request, session }) => {
 
 	if (isEmpty) {
 		// 首次初始化：必须提供正确的 ADMIN_SETUP_TOKEN
-		const expected = env.ADMIN_SETUP_TOKEN;
-		if (!expected) {
-			return json(
-				{ ok: false, error: "服务端未设置 ADMIN_SETUP_TOKEN，无法初始化管理员" },
-				500,
+		const { value: expected, source, availableKeys } = await readEnv("ADMIN_SETUP_TOKEN");
+		if (expected) {
+			// 配了令牌：必须校验一致，防止他人抢先创建管理员
+			if ((body.setupToken ?? "") !== expected) {
+				return json({ ok: false, error: "初始化令牌不正确" }, 403);
+			}
+		} else {
+			// 未配令牌：库里没有任何管理员时允许直接创建第一个账号。
+			// 这是「首次初始化」的一次性窗口，创建成功后 users 非空，该分支不再命中。
+			// 若担心他人抢先初始化，请配置 ADMIN_SETUP_TOKEN。
+			console.warn(
+				`[admin/login] 未配置 ADMIN_SETUP_TOKEN（来源=${source}），允许首次创建管理员。` +
+					`可见变量：${availableKeys.length ? availableKeys.join(", ") : "(空)"}`,
 			);
-		}
-		if ((body.setupToken ?? "") !== expected) {
-			return json({ ok: false, error: "初始化令牌不正确" }, 403);
 		}
 		const hash = await hashPassword(password);
 		await db
